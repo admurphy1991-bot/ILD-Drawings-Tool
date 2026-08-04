@@ -14,7 +14,9 @@ export function blankPage() {
  *  (annId => void) since this is a pure function, not a class method. */
 export function enrichPage(page, handlers = {}) {
   const { onEdit, onDelete, onAddExclusion, onClearExclusions } = handlers
-  const ppu = page.scale ? page.scale.ppu : null
+  // Demonstrate-only pages never measure, even if they carry a stale calibration
+  // from before the page was switched into demo mode.
+  const ppu = !page.demoMode && page.scale ? page.scale.ppu : null
   const vbW = 1000
   const vbH = page.naturalW ? Math.round((1000 * page.naturalH) / page.naturalW) : 700
   const counters = { line: 0, area: 0, point: 0, text: 0 }
