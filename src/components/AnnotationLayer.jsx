@@ -25,9 +25,6 @@ export default function AnnotationLayer({ annotations, showBreachNumbers, marker
               {ann.holesEnriched.map((hole, i) => (
                 <polygon key={i} points={hole.pointsStr} style={{ fill: '#fff', fillOpacity: 0.6, stroke: '#64748b', strokeWidth: 2, strokeDasharray: '5 4' }} />
               ))}
-              <foreignObject x={ann.labelX} y={ann.labelY} width="1" height="1" style={{ overflow: 'visible', pointerEvents: 'none' }}>
-                <div style={labelStyle(ann.color, 16)}>{ann.svgLabel}</div>
-              </foreignObject>
             </>
           )}
           {ann.isPoint && (
