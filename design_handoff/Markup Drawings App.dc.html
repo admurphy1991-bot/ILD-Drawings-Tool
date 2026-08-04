@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+  <script src="./doc-page.js"></script>
+  <script src="./image-slot.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</helmet>
+
+<div style="height:100vh;width:100vw;display:flex;flex-direction:column;font-family:'Public Sans',sans-serif;background:#eef0f3;color:#0f172a;overflow:hidden">
+
+  <div style="height:56px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#0f172a;color:#fff">
+    <div style="display:flex;align-items:baseline;gap:8px">
+      <span style="font-weight:700;font-size:16px;letter-spacing:0.2px">Overlay</span>
+      <span style="font-size:12px;color:#94a3b8">Drawing Markup</span>
+    </div>
+    <sc-if value="{{ isWorkspace }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ goToReport }}" style="background:#ea580c;color:#fff;border:none;padding:9px 18px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#c2410c" style-disabled="opacity:0.4;cursor:not-allowed">Generate Report</button>
+    </sc-if>
+    <sc-if value="{{ isReport }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px">
+        <button onClick="{{ backToEditor }}" style="background:transparent;color:#e2e8f0;border:1px solid #475569;padding:9px 16px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#1e293b">Back to Editor</button>
+        <button onClick="{{ printReport }}" style="background:#ea580c;color:#fff;border:none;padding:9px 16px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#c2410c">Print / Save PDF</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <input type="file" accept="image/*,application/pdf,.pdf" multiple="{{ true }}" ref="{{ fileInputRef }}" onChange="{{ onFilesSelected }}" style="display:none">
+
+  <sc-if value="{{ isUpload }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:40px">
+      <div style="width:100%;max-width:640px;display:flex;flex-direction:column;gap:20px">
+        <div>
+          <h1 style="font-size:24px;margin:0 0 6px">Upload drawing pages</h1>
+          <p style="font-size:14px;color:#475569;margin:0">Add one or more high-resolution construction drawing pages (PDF, PNG, or JPG). Multi-page PDFs are split into one page per sheet automatically. You'll set the scale and mark up each page next.</p>
+        </div>
+        <div onClick="{{ triggerFilePicker }}" style="border:2px dashed #cbd5e1;border-radius:8px;padding:36px;text-align:center;cursor:pointer;background:#fff" style-hover="border-color:#ea580c;background:#fff7ed">
+          <div style="font-size:15px;font-weight:600;margin-bottom:4px">{{ dropzoneLabel }}</div>
+          <img src="./screenshot-2026-08-04-at-11-00-00-am-msdu0utz-fybi.png" alt="screenshot-2026-08-04-at-11-00-00-am" width="2132" height="1506" style="max-width: 100%; height: auto; display: block; object-fit: cover; width: 2132px; aspect-ratio: 2132 / 1506"><div style="font-size:12px;color:#94a3b8">or drag and drop image files here</div>
+        </div>
+        <sc-if value="{{ hasPages }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ uploadPages }}" as="pg" hint-placeholder-count="0">
+              <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px">
+                <img src="{{ pg.img }}" loading="lazy" style="width:56px;height:40px;object-fit:cover;border-radius:3px;flex:0 0 auto">
+                <span style="flex:1;font-size:13px;font-weight:500">{{ pg.name }}</span>
+                <button onClick="{{ pg.onRemove }}" style="background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer;line-height:1" style-hover="color:#dc2626">×</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <button onClick="{{ goToWorkspace }}" disabled="{{ !hasPages }}" style="align-self:flex-start;background:#ea580c;color:#fff;border:none;padding:11px 22px;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#c2410c" style-disabled="opacity:0.4;cursor:not-allowed;background:#94a3b8">Continue to Markup</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isWorkspace }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;overflow:hidden">
+
+      <div style="width:96px;flex:0 0 auto;background:#0f172a;display:flex;flex-direction:column;padding:12px 0;gap:2px">
+        <sc-for list="{{ toolButtons }}" as="tool" hint-placeholder-count="5">
+          <button onClick="{{ tool.onClick }}" disabled="{{ tool.disabled }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:{{ tool.bg }};border:none;padding:12px 4px;cursor:pointer;color:#e2e8f0" style-hover="background:#1e293b" style-disabled="opacity:0.3;cursor:not-allowed">
+            <span style="width:14px;height:14px;border-radius:50%;background:{{ tool.color }};border:2px solid #fff"></span>
+            <span style="font-size:11px;font-weight:600;text-align:center">{{ tool.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+        <div style="height:56px;flex:0 0 auto;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;padding:0 12px;overflow-x:auto">
+          <sc-for list="{{ pageTabs }}" as="pg" hint-placeholder-count="0">
+            <button onClick="{{ pg.onSelect }}" style="display:flex;align-items:center;gap:8px;background:{{ pg.bg }};border:1px solid {{ pg.border }};border-radius:6px;padding:6px 10px;cursor:pointer;flex:0 0 auto">
+              <img src="{{ pg.img }}" loading="lazy" style="width:36px;height:26px;object-fit:cover;border-radius:2px">
+              <span style="font-size:12px;font-weight:600;color:#0f172a;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ pg.name }}</span>
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ pg.scaleColor }}"></span>
+            </button>
+          </sc-for>
+          <button onClick="{{ triggerFilePicker }}" style="flex:0 0 auto;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;color:#475569" style-hover="border-color:#ea580c;color:#ea580c">+ Add page</button>
+          <button onClick="{{ undo }}" disabled="{{ !canUndo }}" style="flex:0 0 auto;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;color:#475569;margin-left:auto" style-hover="border-color:#0f172a" style-disabled="opacity:0.35;cursor:not-allowed">Undo</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:12px">
+          <span style="color:#64748b">Page mode:</span>
+          <button onClick="{{ setMeasureMode }}" style="background:{{ measureBg }};color:{{ measureColor }};border:1px solid #cbd5e1;padding:4px 10px;border-radius:14px 0 0 14px;font-size:11px;font-weight:600;cursor:pointer">Measure</button>
+          <button onClick="{{ setDemoModeOn }}" style="background:{{ demoBg }};color:{{ demoColor }};border:1px solid #cbd5e1;border-left:none;padding:4px 10px;border-radius:0 14px 14px 0;font-size:11px;font-weight:600;cursor:pointer">Demonstrate only</button>
+          <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+            <span style="color:#64748b">Start breach numbering at:</span>
+            <input type="number" min="1" value="{{ breachStartValue }}" onChange="{{ onBreachStartChange }}" style="width:56px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px"></input>
+          </div>
+        </div>
+
+        <sc-if value="{{ !hasScale }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ !activePageEnriched.demoMode }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#fff7ed;border-bottom:1px solid #fed7aa;color:#9a3412;font-size:13px;padding:8px 16px">Calibrate the scale on this page before drawing lines, areas, or points — or switch to "Demonstrate only" to mark up without measuring.</div>
+          </sc-if>
+        </sc-if>
+
+        <div ref="{{ canvasScrollRef }}" onMouseDown="{{ onCanvasMouseDown }}" style="flex:1;position:relative;display:flex;overflow:auto;padding:24px;background:#dfe3e8;cursor:{{ containerCursor }}">
+          <div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:15;background:#0f172a;color:#e2e8f0;font-size:12px;padding:8px 14px;border-radius:20px;display:flex;align-items:center;gap:12px;max-width:80%;box-shadow:0 4px 12px rgba(0,0,0,0.25)">
+            <span>{{ instructionText }}</span>
+            <sc-if value="{{ draftActive }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ finishDraft }}" disabled="{{ !draftCanFinish }}" style="background:#16a34a;color:#fff;border:none;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:700;cursor:pointer" style-disabled="opacity:0.4;cursor:not-allowed">Finish</button>
+              <button onClick="{{ cancelDraft }}" style="background:transparent;color:#f87171;border:1px solid #f87171;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:700;cursor:pointer">Cancel</button>
+            </sc-if>
+          </div>
+
+          <div style="position:absolute;bottom:16px;right:16px;z-index:15;background:#0f172a;color:#e2e8f0;border-radius:20px;display:flex;align-items:center;gap:2px;padding:4px;box-shadow:0 4px 12px rgba(0,0,0,0.25)">
+            <button onClick="{{ zoomOut }}" style="background:transparent;border:none;color:#e2e8f0;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer" style-hover="background:#1e293b">−</button>
+            <span onClick="{{ resetZoom }}" style="font-family:'IBM Plex Mono',monospace;font-size:11px;width:44px;text-align:center;cursor:pointer">{{ zoomPct }}</span>
+            <button onClick="{{ zoomIn }}" style="background:transparent;border:none;color:#e2e8f0;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer" style-hover="background:#1e293b">+</button>
+          </div>
+
+          <div style="position:relative;width:{{ canvasWidthPx }};max-width:none;aspect-ratio:{{ activePageEnriched.aspectRatio }};background:#fff;box-shadow:0 2px 14px rgba(0,0,0,0.15);flex:0 0 auto;margin:auto">
+            <svg ref="{{ svgRef }}" viewBox="{{ activePageEnriched.viewBoxStr }}" onClick="{{ onSvgClick }}" onMouseMove="{{ onSvgMouseMove }}" onDoubleClick="{{ onSvgDoubleClick }}" style="width:100%;height:100%;display:block;cursor:{{ canvasCursor }}">
+              <sc-if value="{{ hasActiveImg }}" hint-placeholder-val="{{ false }}">
+                <image href="{{ activePageEnriched.img }}" x="0" y="0" width="{{ activePageEnriched.vbW }}" height="{{ activePageEnriched.vbH }}"></image>
+              </sc-if>
+
+              <defs>
+                <marker id="breachArrow" markerWidth="5" markerHeight="5" refX="4" refY="2" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L4,2 L0,4 Z" style="fill:#dc2626"></path>
+                </marker>
+              </defs>
+              <sc-for list="{{ activePageEnriched.annotations }}" as="ann" hint-placeholder-count="0">
+                <sc-if value="{{ ann.isLine }}" hint-placeholder-val="{{ false }}">
+                  <polyline points="{{ ann.pointsStr }}" style="fill:none;stroke:{{ ann.color }};stroke-width:4;stroke-linecap:round;stroke-linejoin:round"></polyline>
+                  <foreignObject x="{{ ann.labelX }}" y="{{ ann.labelY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                    <div style="transform:translate(-50%,-50%);white-space:nowrap;font:600 16px 'IBM Plex Mono',monospace;color:{{ ann.color }};background:#fff;padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.svgLabel }}</div>
+                  </foreignObject>
+                </sc-if>
+                <sc-if value="{{ ann.isArea }}" hint-placeholder-val="{{ false }}">
+                  <path d="{{ ann.pathD }}" style="fill:{{ ann.color }};fill-opacity:0.18;stroke:none;fill-rule:evenodd"></path>
+                  <polygon points="{{ ann.pointsStr }}" style="fill:none;stroke:{{ ann.color }};stroke-width:3"></polygon>
+                  <sc-for list="{{ ann.holesEnriched }}" as="hole" hint-placeholder-count="0">
+                    <polygon points="{{ hole.pointsStr }}" style="fill:#fff;fill-opacity:0.6;stroke:#64748b;stroke-width:2;stroke-dasharray:5 4"></polygon>
+                  </sc-for>
+                  <foreignObject x="{{ ann.labelX }}" y="{{ ann.labelY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                    <div style="transform:translate(-50%,-50%);white-space:nowrap;font:600 16px 'IBM Plex Mono',monospace;color:{{ ann.color }};background:#fff;padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.svgLabel }}</div>
+                  </foreignObject>
+                </sc-if>
+                <sc-if value="{{ ann.isPoint }}" hint-placeholder-val="{{ false }}">
+                  <line x1="{{ ann.tailX }}" y1="{{ ann.tailY }}" x2="{{ ann.labelX }}" y2="{{ ann.labelY }}" style="stroke:{{ ann.color }};stroke-width:1.6" marker-end="url(#breachArrow)"></line>
+                  <line x1="{{ ann.crossX1 }}" y1="{{ ann.crossY1 }}" x2="{{ ann.crossX2 }}" y2="{{ ann.crossY2 }}" style="stroke:{{ ann.color }};stroke-width:2.2"></line>
+                  <line x1="{{ ann.crossX3 }}" y1="{{ ann.crossY3 }}" x2="{{ ann.crossX4 }}" y2="{{ ann.crossY4 }}" style="stroke:{{ ann.color }};stroke-width:2.2"></line>
+                  <sc-if value="{{ showBreachNumbers }}" hint-placeholder-val="{{ true }}">
+                    <foreignObject x="{{ ann.tailX }}" y="{{ ann.tailY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                      <div style="transform:translate(-50%,-50%);white-space:nowrap;font:700 15px 'IBM Plex Mono',monospace;color:#000;background:#fff;padding:1px 6px;border-radius:10px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.markerLabel }}</div>
+                    </foreignObject>
+                  </sc-if>
+                </sc-if>
+                <sc-if value="{{ ann.isText }}" hint-placeholder-val="{{ false }}">
+                  <foreignObject x="{{ ann.labelX }}" y="{{ ann.labelY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                    <div style="transform:translate(-50%,-50%);white-space:nowrap;font:600 18px 'IBM Plex Mono',monospace;color:{{ ann.color }};background:#fff;padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.valueLabel }}</div>
+                  </foreignObject>
+                </sc-if>
+              </sc-for>
+
+              <sc-if value="{{ draftActive }}" hint-placeholder-val="{{ false }}">
+                <sc-if value="{{ draftIsClosedShape }}" hint-placeholder-val="{{ false }}">
+                  <sc-if value="{{ draftIsExclude }}" hint-placeholder-val="{{ false }}">
+                    <polygon points="{{ draftPreviewPts }}" style="fill:#94a3b8;fill-opacity:0.3;stroke:#475569;stroke-width:3;stroke-dasharray:6 5"></polygon>
+                  </sc-if>
+                  <sc-if value="{{ !draftIsExclude }}" hint-placeholder-val="{{ true }}">
+                    <polygon points="{{ draftPreviewPts }}" style="fill:#16a34a;fill-opacity:0.15;stroke:#16a34a;stroke-width:3;stroke-dasharray:8 6"></polygon>
+                  </sc-if>
+                </sc-if>
+                <sc-if value="{{ !draftIsClosedShape }}" hint-placeholder-val="{{ true }}">
+                  <polyline points="{{ draftPreviewPts }}" style="fill:none;stroke:#2563eb;stroke-width:3;stroke-dasharray:8 6"></polyline>
+                </sc-if>
+                <sc-if value="{{ draftNearStart }}" hint-placeholder-val="{{ false }}">
+                  <circle cx="{{ draftStartPoint.x }}" cy="{{ draftStartPoint.y }}" r="14" style="fill:none;stroke:#16a34a;stroke-width:4"></circle>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ calibActive }}" hint-placeholder-val="{{ false }}">
+                <circle cx="{{ calibFirstPoint.x }}" cy="{{ calibFirstPoint.y }}" r="7" style="fill:#ea580c;stroke:#fff;stroke-width:2"></circle>
+                <polyline points="{{ calibLinePts }}" style="stroke:#ea580c;stroke-width:3;stroke-dasharray:6 6"></polyline>
+              </sc-if>
+
+              <sc-if value="{{ calibInputActive }}" hint-placeholder-val="{{ false }}">
+                <polyline points="{{ calibInputLinePts }}" style="stroke:#ea580c;stroke-width:3"></polyline>
+              </sc-if>
+            </svg>
+
+            <sc-if value="{{ calibInputActive }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:{{ calibInputLeftPct }};top:{{ calibInputTopPct }};transform:translate(-50%,-115%);background:#fff;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,0.25);padding:14px;min-width:220px;z-index:20">
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px">Real-world distance</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+                  <input type="number" step="0.01" placeholder="e.g. 9" value="{{ calibInput.value }}" onChange="{{ onCalibValueChange }}" style="width:90px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px">
+                  <span style="font-size:13px;color:#475569">meters</span>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end">
+                  <button onClick="{{ cancelCalibInput }}" style="background:transparent;border:1px solid #cbd5e1;padding:6px 12px;border-radius:4px;font-size:12px;cursor:pointer">Cancel</button>
+                  <button onClick="{{ confirmCalibration }}" style="background:#ea580c;color:#fff;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer">Set Scale</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ formActive }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:{{ formLeftPct }};top:{{ formTopPct }};transform:translate(-50%,-112%);background:#fff;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,0.25);padding:14px;min-width:240px;z-index:20">
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px">{{ formTitle }}</div>
+                <sc-if value="{{ formIsSubstrate }}" hint-placeholder-val="{{ false }}">
+                  <select value="{{ activeForm.value }}" onChange="{{ onFormValueChange }}" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;font-family:inherit;background:#fff">
+                    <option value="">Select type…</option>
+                    <option value="Plywood">Plywood</option>
+                    <option value="Concrete">Concrete</option>
+                    <option value="Warm Roof">Warm Roof</option>
+                  </select>
+                </sc-if>
+                <sc-if value="{{ !formIsSubstrate }}" hint-placeholder-val="{{ true }}">
+                  <textarea value="{{ activeForm.value }}" onChange="{{ onFormValueChange }}" placeholder="{{ formPlaceholder }}" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+                </sc-if>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+                  <button onClick="{{ cancelForm }}" style="background:transparent;border:1px solid #cbd5e1;padding:6px 12px;border-radius:4px;font-size:12px;cursor:pointer">Cancel</button>
+                  <button onClick="{{ saveForm }}" style="background:#ea580c;color:#fff;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer">Save</button>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:300px;flex:0 0 auto;background:#fff;border-left:1px solid #e2e8f0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:20px">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#94a3b8;margin-bottom:10px">Job details</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <input value="{{ job.clientName }}" onChange="{{ onClientNameChange }}" placeholder="Client name" style="padding:7px 9px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px">
+            <input value="{{ job.address }}" onChange="{{ onAddressChange }}" placeholder="Site address" style="padding:7px 9px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px">
+            <input value="{{ job.reportTitle }}" onChange="{{ onReportTitleChange }}" placeholder="Report title" style="padding:7px 9px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px">
+            <input value="{{ job.company }}" onChange="{{ onCompanyChange }}" placeholder="Your company name" style="padding:7px 9px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px">
+            <input value="{{ job.date }}" onChange="{{ onDateChange }}" placeholder="Date" style="padding:7px 9px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px">
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#94a3b8;margin-bottom:10px">This page</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:8px 10px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Length</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">{{ activePageEnriched.totalLengthLabel }}</div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:8px 10px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Area</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">{{ activePageEnriched.totalAreaLabel }}</div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:8px 10px;grid-column:span 2">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Breaches flagged</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">{{ activePageEnriched.breachCount }}</div>
+            </div>
+          </div>
+        </div>
+
+        <sc-if value="{{ hasAreaAnnotations }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-wrap:wrap;gap:8px 12px">
+            <sc-for list="{{ substrateLegend }}" as="leg" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="width:9px;height:9px;border-radius:50%;background:{{ leg.color }}"></span>
+                <span style="font-size:11px;color:#64748b">{{ leg.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#94a3b8;margin-bottom:10px">Annotations</div>
+          <sc-if value="{{ activePageEnriched.hasAnnotations }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ activePageEnriched.annotations }}" as="ann" hint-placeholder-count="0">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9">
+                  <span style="width:10px;height:10px;border-radius:50%;background:{{ ann.color }};flex:0 0 auto"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#475569;flex:0 0 auto">{{ ann.markerLabel }}</span>
+                  <span style="flex:1;font-size:12px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ann.valueLabel }}</span>
+                  <sc-if value="{{ ann.isEditable }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ ann.onEdit }}" style="background:none;border:none;color:#2563eb;font-size:11px;cursor:pointer;padding:2px">Edit</button>
+                  </sc-if>
+                  <button onClick="{{ ann.onDelete }}" style="background:none;border:none;color:#cbd5e1;font-size:15px;cursor:pointer;line-height:1;padding:2px" style-hover="color:#dc2626">×</button>
+                </div>
+                <sc-if value="{{ ann.isArea }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:4px;padding:0 0 8px 18px">
+                    <button onClick="{{ ann.onAddExclusion }}" style="background:none;border:none;color:#64748b;font-size:11px;cursor:pointer;padding:2px">+ Exclude untestable area</button>
+                    <sc-if value="{{ ann.hasHoles }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:11px;color:#94a3b8">· {{ ann.holesCount }} excluded</span>
+                      <button onClick="{{ ann.onClearExclusions }}" style="background:none;border:none;color:#dc2626;font-size:11px;cursor:pointer;padding:2px">Clear</button>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ !activePageEnriched.hasAnnotations }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:12px;color:#94a3b8">No annotations on this page yet.</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isReport }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;overflow:auto;position:relative">
+      <doc-page orientation="landscape">
+        <sc-for list="{{ reportPages }}" as="pg" hint-placeholder-count="0">
+          <section class="page" style="display:flex;flex-direction:column;padding:14px;background:#fff">
+            <div style="flex:1;position:relative;overflow:hidden;border:1px solid #94a3b8;margin-bottom:8px">
+              <svg viewBox="{{ pg.viewBoxStr }}" style="width:100%;height:100%;display:block">
+                <defs>
+                  <marker id="breachArrowReport" markerWidth="5" markerHeight="5" refX="4" refY="2" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L4,2 L0,4 Z" style="fill:#dc2626"></path>
+                  </marker>
+                </defs>
+                <sc-if value="{{ pg.hasImg }}" hint-placeholder-val="{{ false }}">
+                  <image href="{{ pg.img }}" x="0" y="0" width="{{ pg.vbW }}" height="{{ pg.vbH }}"></image>
+                </sc-if>
+                <sc-for list="{{ pg.annotations }}" as="ann" hint-placeholder-count="0">
+                  <sc-if value="{{ ann.isLine }}" hint-placeholder-val="{{ false }}">
+                    <polyline points="{{ ann.pointsStr }}" style="fill:none;stroke:{{ ann.color }};stroke-width:4;stroke-linecap:round;stroke-linejoin:round"></polyline>
+                    <foreignObject x="{{ ann.labelX }}" y="{{ ann.labelY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                    <div style="transform:translate(-50%,-50%);white-space:nowrap;font:600 16px 'IBM Plex Mono',monospace;color:{{ ann.color }};background:#fff;padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.svgLabel }}</div>
+                  </foreignObject>
+                  </sc-if>
+                  <sc-if value="{{ ann.isArea }}" hint-placeholder-val="{{ false }}">
+                    <path d="{{ ann.pathD }}" style="fill:{{ ann.color }};fill-opacity:0.28;stroke:none;fill-rule:evenodd"></path>
+                    <polygon points="{{ ann.pointsStr }}" style="fill:none;stroke:{{ ann.color }};stroke-width:3"></polygon>
+                    <sc-for list="{{ ann.holesEnriched }}" as="hole" hint-placeholder-count="0">
+                      <polygon points="{{ hole.pointsStr }}" style="fill:#fff;fill-opacity:0.6;stroke:#64748b;stroke-width:2;stroke-dasharray:5 4"></polygon>
+                    </sc-for>
+                    <foreignObject x="{{ ann.labelX }}" y="{{ ann.labelY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                    <div style="transform:translate(-50%,-50%);white-space:nowrap;font:600 16px 'IBM Plex Mono',monospace;color:{{ ann.color }};background:#fff;padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.svgLabel }}</div>
+                  </foreignObject>
+                  </sc-if>
+                  <sc-if value="{{ ann.isPoint }}" hint-placeholder-val="{{ false }}">
+                    <line x1="{{ ann.tailX }}" y1="{{ ann.tailY }}" x2="{{ ann.labelX }}" y2="{{ ann.labelY }}" style="stroke:{{ ann.color }};stroke-width:1.6" marker-end="url(#breachArrowReport)"></line>
+                    <line x1="{{ ann.crossX1 }}" y1="{{ ann.crossY1 }}" x2="{{ ann.crossX2 }}" y2="{{ ann.crossY2 }}" style="stroke:{{ ann.color }};stroke-width:2.2"></line>
+                    <line x1="{{ ann.crossX3 }}" y1="{{ ann.crossY3 }}" x2="{{ ann.crossX4 }}" y2="{{ ann.crossY4 }}" style="stroke:{{ ann.color }};stroke-width:2.2"></line>
+                    <sc-if value="{{ showBreachNumbers }}" hint-placeholder-val="{{ true }}">
+                    <foreignObject x="{{ ann.tailX }}" y="{{ ann.tailY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                      <div style="transform:translate(-50%,-50%);white-space:nowrap;font:700 15px 'IBM Plex Mono',monospace;color:#000;background:#fff;padding:1px 6px;border-radius:10px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.markerLabel }}</div>
+                    </foreignObject>
+                  </sc-if>
+                  </sc-if>
+                  <sc-if value="{{ ann.isText }}" hint-placeholder-val="{{ false }}">
+                    <foreignObject x="{{ ann.labelX }}" y="{{ ann.labelY }}" width="1" height="1" style="overflow:visible;pointer-events:none">
+                    <div style="transform:translate(-50%,-50%);white-space:nowrap;font:600 18px 'IBM Plex Mono',monospace;color:{{ ann.color }};background:#fff;padding:1px 6px;border-radius:3px;box-shadow:0 0 0 1px rgba(15,23,42,0.08);display:inline-block">{{ ann.valueLabel }}</div>
+                  </foreignObject>
+                  </sc-if>
+                </sc-for>
+              </svg>
+            </div>
+
+            <div style="flex:0 0 auto;border:1px solid #0f172a;font-size:9px;color:#0f172a">
+              <div style="display:flex">
+                <div style="flex:1.1;padding:6px 8px;border-right:1px solid #0f172a">
+                  <div style="font-weight:700;margin-bottom:3px">Client:</div>
+                  <div>{{ job.clientName }}</div>
+                  <div>{{ job.address }}</div>
+                </div>
+                <div style="flex:1;padding:6px 8px;border-right:1px solid #0f172a">
+                  <div style="font-weight:700;margin-bottom:3px">Project:</div>
+                  <div>{{ job.reportTitle }}</div>
+                </div>
+                <div style="flex:1;padding:6px 8px;border-right:1px solid #0f172a">
+                  <div style="font-weight:700;margin-bottom:3px">Drawing:</div>
+                  <div>{{ pg.name }}</div>
+                  <div style="color:#64748b">{{ pg.scaleLabel }}</div>
+                </div>
+                <div style="flex:1.1;padding:6px 8px;border-right:1px solid #0f172a">
+                  <div style="font-weight:700;margin-bottom:3px">Markup Colours:</div>
+                  <sc-if value="{{ pg.hasMarkupColours }}" hint-placeholder-val="{{ false }}">
+                    <sc-for list="{{ pg.markupColours }}" as="mc" hint-placeholder-count="0">
+                      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+                        <span style="width:22px;height:10px;background:{{ mc.color }};border:1px solid #0f172a;flex:0 0 auto"></span>
+                        <span>{{ mc.label }}</span>
+                      </div>
+                    </sc-for>
+                  </sc-if>
+                </div>
+                <div style="flex:1.3;padding:6px 8px;border-right:1px solid #0f172a">
+                  <div style="font-weight:700;margin-bottom:3px">Symbol Key:</div>
+                  <sc-if value="{{ pg.hasSymbolKey }}" hint-placeholder-val="{{ false }}">
+                    <sc-for list="{{ pg.symbolKeyItems }}" as="sym" hint-placeholder-count="0">
+                      <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+                        <span style="width:9px;height:9px;border-radius:50%;background:{{ sym.color }};flex:0 0 auto"></span>
+                        <span>{{ sym.label }}</span>
+                      </div>
+                    </sc-for>
+                  </sc-if>
+                </div>
+                <div style="flex:1.2;padding:6px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+                  <div style="width:80px;height:56px;display:flex;align-items:center;justify-content:center">
+                    <img src="assets/ild-logo.jpeg" alt="ILD logo" style="max-width:100%;max-height:100%;object-fit:contain">
+                  </div>
+                  <div style="font-weight:700;text-align:center">{{ job.company }}</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #0f172a;padding:4px 8px;font-size:8px">
+                <span>{{ reportYear }}</span>
+                <span style="font-style:italic;color:#64748b">This drawing is the property of {{ job.company }} and may not be reproduced without consent.</span>
+                <span style="font-weight:700">NOT TO SCALE</span>
+              </div>
+            </div>
+          </section>
+        </sc-for>
+
+        <section class="page" style="display:flex;flex-direction:column;padding:24px;background:#fff">
+          <h1 style="font-size:26px;margin:0 0 4px">{{ job.reportTitle }}</h1>
+          <p style="font-size:13px;color:#475569;margin:0 0 20px">Prepared for {{ reportSubtitle }}</p>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:12px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Pages</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ pageCount }}</div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:12px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Total length</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ overallLengthLabel }}</div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:12px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Total area</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ overallAreaLabel }}</div>
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:4px;padding:12px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase">Breaches flagged</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">{{ overallBreach }}</div>
+            </div>
+          </div>
+
+          <sc-for list="{{ reportPages }}" as="pg" hint-placeholder-count="0">
+            <div style="margin-bottom:20px">
+              <h2 style="font-size:15px;margin:0 0 6px">{{ pg.name }}</h2>
+              <sc-if value="{{ pg.hasMeasurements }}" hint-placeholder-val="{{ false }}">
+                <table style="width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px">
+                  <thead>
+                    <tr style="border-bottom:1px solid #0f172a">
+                      <th style="text-align:left;padding:5px 4px">Marker</th>
+                      <th style="text-align:left;padding:5px 4px">Type</th>
+                      <th style="text-align:left;padding:5px 4px">Measurement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{ pg.measurements }}" as="m" hint-placeholder-count="0">
+                      <tr style="border-bottom:1px solid #e2e8f0">
+                        <td style="padding:5px 4px;font-family:'IBM Plex Mono',monospace">{{ m.markerLabel }}</td>
+                        <td style="padding:5px 4px">{{ m.typeLabel }}</td>
+                        <td style="padding:5px 4px;font-family:'IBM Plex Mono',monospace">{{ m.valueLabel }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </sc-if>
+              <sc-if value="{{ pg.hasBreaches }}" hint-placeholder-val="{{ false }}">
+                <sc-for list="{{ pg.breaches }}" as="b" hint-placeholder-count="0">
+                  <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #e2e8f0">
+                    <div style="width:18px;height:18px;border-radius:50%;background:{{ b.color }};color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto">{{ b.markerLabel }}</div>
+                    <div style="flex:1;font-size:11px;color:#334155">{{ b.valueLabel }}</div>
+                    <sc-if value="{{ b.hasPhoto }}" hint-placeholder-val="{{ false }}">
+                      <img src="{{ b.photo }}" loading="lazy" style="width:52px;height:40px;object-fit:cover;border-radius:3px">
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </doc-page>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showBreachNumbers&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Breaches&quot;}}">
+class Component extends DCLogic {
+  svgRef = React.createRef();
+  fileInputRef = React.createRef();
+  canvasScrollRef = React.createRef();
+
+  state = {
+    mode: 'upload',
+    pages: [],
+    activePageIndex: 0,
+    activeTool: 'calibrate',
+    draft: null,
+    calibDraft: null,
+    calibInput: null,
+    activeForm: null,
+    processing: false,
+    zoom: 1,
+    isPanning: false,
+    history: [],
+    job: {
+      clientName: '',
+      address: '',
+      reportTitle: 'Drawing Markup Report',
+      company: 'ILD',
+      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    },
+  };
+
+  polylineLen(points) {
+    let d = 0;
+    for (let i = 1; i < points.length; i++) d += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    return d;
+  }
+  polyArea(points) {
+    let s = 0;
+    for (let i = 0; i < points.length; i++) {
+      const j = (i + 1) % points.length;
+      s += points[i].x * points[j].y - points[j].x * points[i].y;
+    }
+    return Math.abs(s) / 2;
+  }
+  centroid(points) {
+    let x = 0, y = 0;
+    points.forEach(p => { x += p.x; y += p.y; });
+    return { x: x / points.length, y: y / points.length };
+  }
+  buildPathD(outer, holes) {
+    const ring = pts => 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ') + ' Z';
+    return ring(outer) + ' ' + (holes || []).map(ring).join(' ');
+  }
+
+  enrichPage(page) {
+    const ppu = page.scale ? page.scale.ppu : null;
+    const vbW = 1000;
+    const vbH = page.naturalW ? Math.round((1000 * page.naturalH) / page.naturalW) : 700;
+    const counters = { line: 0, area: 0, point: 0, text: 0 };
+    const breachStart = parseInt(page.breachStartNumber, 10) || 1;
+    const COLORS = { line: '#2563eb', area: '#39ff14', point: '#dc2626', text: '#334155' };
+    const SUBSTRATE_COLORS = { Plywood: '#ccff00', Concrete: '#00e5ff', 'Warm Roof': '#ff3c00' };
+    const annotations = page.annotations.map(a => {
+      let labelX = 0, labelY = 0, valueLabel = '', markerLabel = '', pointsStr = '';
+      if (a.type === 'line') {
+        counters.line++; markerLabel = 'L' + counters.line;
+        pointsStr = a.points.map(p => p.x + ',' + p.y).join(' ');
+        const len = this.polylineLen(a.points);
+        valueLabel = ppu ? (len / ppu).toFixed(2) + ' m' : '—';
+        const mid = a.points[Math.floor((a.points.length - 1) / 2)];
+        labelX = mid.x; labelY = mid.y - 14;
+      }
+      let netAreaUnits = 0, tailX = 0, tailY = 0, svgLabel = '';
+      let crossX1 = 0, crossY1 = 0, crossX2 = 0, crossY2 = 0, crossX3 = 0, crossY3 = 0, crossX4 = 0, crossY4 = 0;
+      if (a.type === 'area') {
+        counters.area++; markerLabel = 'A' + counters.area;
+        pointsStr = a.points.map(p => p.x + ',' + p.y).join(' ');
+        const outerArea = this.polyArea(a.points);
+        const holesArea = (a.holes || []).reduce((s, h) => s + this.polyArea(h), 0);
+        netAreaUnits = Math.max(0, outerArea - holesArea);
+        const areaStr = ppu ? (netAreaUnits / (ppu * ppu)).toFixed(2) + ' m\u00b2' : '';
+        valueLabel = (areaStr ? areaStr + ' · ' : '') + (a.substrate || 'Substrate not set');
+        const c = this.centroid(a.points);
+        labelX = c.x; labelY = c.y;
+        svgLabel = markerLabel + ' · ' + (areaStr || (a.substrate || 'Substrate not set'));
+      } else if (a.type === 'point') {
+        counters.point++; markerLabel = 'B' + (breachStart + counters.point - 1);
+        labelX = a.points[0].x; labelY = a.points[0].y;
+        valueLabel = a.note || 'No notes yet';
+        let tailDx = 30, tailDy = -30;
+        if (labelX + tailDx > vbW - 20) tailDx = -30;
+        if (labelY + tailDy < 20) tailDy = 30;
+        tailX = labelX + tailDx; tailY = labelY + tailDy;
+        const cs = 5;
+        crossX1 = labelX - cs; crossY1 = labelY - cs; crossX2 = labelX + cs; crossY2 = labelY + cs;
+        crossX3 = labelX - cs; crossY3 = labelY + cs; crossX4 = labelX + cs; crossY4 = labelY - cs;
+      } else {
+        counters.text++; markerLabel = 'T' + counters.text;
+        labelX = a.points[0].x; labelY = a.points[0].y;
+        valueLabel = a.label || '';
+      }
+      if (a.type === 'line') {
+        const areaLenLabel = ppu ? (this.polylineLen(a.points) / ppu).toFixed(2) + ' m' : '';
+        valueLabel = areaLenLabel || '—';
+        svgLabel = areaLenLabel ? markerLabel + ' · ' + areaLenLabel : markerLabel;
+      }
+      return {
+        ...a,
+        isLine: a.type === 'line', isArea: a.type === 'area', isPoint: a.type === 'point', isText: a.type === 'text',
+        isEditable: a.type === 'point' || a.type === 'text' || a.type === 'area',
+        pointsStr, valueLabel, markerLabel, labelX, labelY, svgLabel, tailX, tailY, netAreaUnits,
+        crossX1, crossY1, crossX2, crossY2, crossX3, crossY3, crossX4, crossY4,
+        color: a.type === 'area' ? (SUBSTRATE_COLORS[a.substrate] || COLORS.area) : COLORS[a.type],
+        leftPct: (labelX / vbW) * 100 + '%', topPct: (labelY / vbH) * 100 + '%',
+        hasPhoto: !!a.photo, photo: a.photo,
+        typeLabel: a.type === 'line' ? 'Line' : a.type === 'area' ? 'Area' : a.type === 'point' ? 'Breach' : 'Label',
+        onEdit: () => this.editAnnotation(a), onDelete: () => this.deleteAnnotation(a.id),
+        pathD: a.type === 'area' ? this.buildPathD(a.points, a.holes || []) : null,
+        holesCount: (a.holes || []).length, hasHoles: (a.holes || []).length > 0,
+        holesEnriched: (a.holes || []).map(h => ({ pointsStr: h.map(p => p.x + ',' + p.y).join(' ') })),
+        onAddExclusion: () => this.startExclude(a.id), onClearExclusions: () => this.clearExclusions(a.id),
+      };
+    });
+    const totalLength = annotations.filter(a => a.isLine).reduce((s, a) => s + (ppu ? this.polylineLen(a.points) / ppu : 0), 0);
+    const totalArea = annotations.filter(a => a.isArea).reduce((s, a) => s + (ppu ? a.netAreaUnits / (ppu * ppu) : 0), 0);
+    const breachCount = annotations.filter(a => a.isPoint).length;
+    const usedSubstrates = [...new Set(annotations.filter(a => a.isArea).map(a => a.substrate || 'Not set'))];
+    const markupColours = usedSubstrates.map(s => ({ label: s, color: SUBSTRATE_COLORS[s] || COLORS.area }));
+    const symbolKeyItems = [];
+    if (annotations.some(a => a.isLine)) symbolKeyItems.push({ shape: 'line', color: COLORS.line, label: 'Measured run' });
+    if (annotations.some(a => a.isPoint)) symbolKeyItems.push({ shape: 'point', color: COLORS.point, label: 'Breach / concern' });
+    if (annotations.some(a => a.isText)) symbolKeyItems.push({ shape: 'text', color: COLORS.text, label: 'Callout' });
+    return {
+      ...page, annotations,
+      viewBoxStr: `0 0 ${vbW} ${vbH}`, vbW, vbH,
+      aspectRatio: `${page.naturalW || 3} / ${page.naturalH || 2}`,
+      hasScale: !!page.scale, hasAnnotations: annotations.length > 0,
+      totalLength, totalArea, breachCount,
+      totalLengthLabel: totalLength.toFixed(2) + ' m', totalAreaLabel: totalArea.toFixed(2) + ' m\u00b2',
+      scaleLabel: page.scale ? `Calibrated · ${page.scale.value} m reference` : 'Not calibrated',
+      measurements: annotations.filter(a => a.isLine || a.isArea),
+      hasMeasurements: annotations.some(a => a.isLine || a.isArea),
+      breaches: annotations.filter(a => a.isPoint),
+      hasBreaches: annotations.some(a => a.isPoint),
+      markupColours, symbolKeyItems, hasMarkupColours: markupColours.length > 0, hasSymbolKey: symbolKeyItems.length > 0,
+      hasImg: !!page.img, demoMode: !!page.demoMode,
+    };
+  }
+
+  async pdfFileToPages(f) {
+    if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    const buf = await f.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    const baseName = f.name.replace(/\.[^.]+$/, '');
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 3 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pages.push({
+        id: 'p' + Date.now() + Math.random().toString(36).slice(2),
+        name: pdf.numPages > 1 ? `${baseName} — p.${i}` : baseName,
+        img: canvas.toDataURL('image/png'), naturalW: canvas.width, naturalH: canvas.height, scale: null, annotations: [],
+      });
+    }
+    return pages;
+  }
+  async imageFileToPage(f) {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+    const dims = await new Promise((res) => {
+      const img = new Image();
+      img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight });
+      img.src = dataUrl;
+    });
+    return {
+      id: 'p' + Date.now() + Math.random().toString(36).slice(2),
+      name: f.name.replace(/\.[^.]+$/, ''),
+      img: dataUrl, naturalW: dims.w, naturalH: dims.h, scale: null, annotations: [],
+    };
+  }
+  async handleFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    this.setState({ processing: true });
+    const newPages = [];
+    for (const f of files) {
+      const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      if (isPdf) newPages.push(...(await this.pdfFileToPages(f)));
+      else newPages.push(await this.imageFileToPage(f));
+    }
+    this.setState(s => ({ pages: [...s.pages, ...newPages], processing: false }));
+  }
+  onFilesSelected(e) { this.handleFiles(e.target.files); e.target.value = ''; }
+  triggerFilePicker() { this.fileInputRef.current && this.fileInputRef.current.click(); }
+  removePage(id) { this.setState(s => ({ pages: s.pages.filter(p => p.id !== id) })); }
+
+  getPoint(e) {
+    const svg = this.svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const rect = svg.getBoundingClientRect();
+    const page = this.state.pages[this.state.activePageIndex];
+    const vbH = page && page.naturalW ? (1000 * page.naturalH) / page.naturalW : 700;
+    const x = ((e.clientX - rect.left) / rect.width) * 1000;
+    const y = ((e.clientY - rect.top) / rect.height) * vbH;
+    return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+  }
+
+  onSvgClick(e) {
+    e.preventDefault();
+    const { activeTool, pages, activePageIndex, activeForm } = this.state;
+    if (activeForm) return;
+    const page = pages[activePageIndex];
+    if (!page) return;
+    const pt = this.getPoint(e);
+
+    if (activeTool === 'calibrate') {
+      const cd = this.state.calibDraft || { points: [] };
+      const pts = [...cd.points, pt];
+      if (pts.length >= 2) this.setState({ calibDraft: null, calibInput: { points: pts, value: '' } });
+      else this.setState({ calibDraft: { points: pts } });
+      return;
+    }
+    if (!page.scale && !page.demoMode) return;
+    if (activeTool === 'area' || activeTool === 'exclude') {
+      const d = this.state.draft || { type: activeTool, points: [] };
+      if (d.points.length >= 3 && this.dist(pt, d.points[0]) < 10) {
+        if (activeTool === 'exclude') this.commitExclusion(this.state.excludeTarget, d.points);
+        else this.commitAnnotation('area', d.points);
+        return;
+      }
+      this.setState({ draft: { ...d, points: [...d.points, pt] } });
+      return;
+    }
+    if (activeTool === 'line') {
+      const d = this.state.draft || { type: 'line', points: [] };
+      this.setState({ draft: { ...d, points: [...d.points, pt] } });
+      return;
+    }
+    if (activeTool === 'point') {
+      const id = 'a' + Date.now() + Math.floor(Math.random() * 1000);
+      const ann = { id, type: 'point', points: [pt], note: '' };
+      const history = this.pushHistory();
+      const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, annotations: [...p.annotations, ann] } : p));
+      this.setState({ pages: pages2, history });
+      return;
+    }
+    if (activeTool === 'text') {
+      const id = 'a' + Date.now() + Math.floor(Math.random() * 1000);
+      const ann = { id, type: 'text', points: [pt], label: '' };
+      const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, annotations: [...p.annotations, ann] } : p));
+      this.setState({ pages: pages2, activeForm: { annId: id, kind: 'text', value: '' } });
+      return;
+    }
+  }
+  onSvgDoubleClick(e) { e.preventDefault(); this.finishDraft(); }
+  onSvgMouseMove(e) {
+    const { activeTool, calibDraft, draft } = this.state;
+    if (activeTool === 'calibrate' && calibDraft && calibDraft.points.length === 1) {
+      const pt = this.getPoint(e);
+      this.setState(s => ({ calibDraft: { ...s.calibDraft, mouse: pt } }));
+    } else if ((activeTool === 'line' || activeTool === 'area' || activeTool === 'exclude') && draft) {
+      const pt = this.getPoint(e);
+      const nearStart = (activeTool === 'area' || activeTool === 'exclude') && draft.points.length >= 3 && this.dist(pt, draft.points[0]) < 10;
+      this.setState(s => ({ draft: { ...s.draft, mouse: pt, nearStart } }));
+    }
+  }
+
+  dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
+  pushHistory() {
+    return [...this.state.history, this.state.pages].slice(-20);
+  }
+  undo() {
+    const { history } = this.state;
+    if (!history.length) return;
+    const prev = history[history.length - 1];
+    this.setState({ pages: prev, history: history.slice(0, -1), draft: null, calibDraft: null, calibInput: null, activeForm: null, excludeTarget: null });
+  }
+  commitAnnotation(type, points) {
+    const { pages, activePageIndex } = this.state;
+    const history = this.pushHistory();
+    const id = 'a' + Date.now() + Math.floor(Math.random() * 1000);
+    const ann = { id, type, points };
+    const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, annotations: [...p.annotations, ann] } : p));
+    const extra = type === 'area' ? { activeForm: { annId: id, kind: 'substrate', value: '' } } : {};
+    this.setState({ pages: pages2, draft: null, history, ...extra });
+  }
+  finishDraft() {
+    const { draft } = this.state;
+    if (!draft) return;
+    const minPts = (draft.type === 'area' || draft.type === 'exclude') ? 3 : 2;
+    if (draft.points.length < minPts) return;
+    if (draft.type === 'exclude') this.commitExclusion(this.state.excludeTarget, draft.points);
+    else this.commitAnnotation(draft.type, draft.points);
+  }
+  cancelDraft() { this.setState({ draft: null, calibDraft: null, excludeTarget: null }); }
+  startExclude(annId) {
+    const page = this.state.pages[this.state.activePageIndex];
+    if (!page || !(page.scale || page.demoMode)) return;
+    this.setState({ activeTool: 'exclude', excludeTarget: annId, draft: null, calibDraft: null, activeForm: null });
+  }
+  commitExclusion(annId, holePoints) {
+    if (!annId || !holePoints || holePoints.length < 3) { this.setState({ draft: null }); return; }
+    const { pages, activePageIndex } = this.state;
+    const history = this.pushHistory();
+    const pages2 = pages.map((p, i) => (i !== activePageIndex ? p : {
+      ...p,
+      annotations: p.annotations.map(a => (a.id === annId ? { ...a, holes: [...(a.holes || []), holePoints] } : a)),
+    }));
+    this.setState({ pages: pages2, draft: null, activeTool: 'exclude', excludeTarget: null, history });
+  }
+  clearExclusions(annId) {
+    const { pages, activePageIndex } = this.state;
+    const history = this.pushHistory();
+    const pages2 = pages.map((p, i) => (i !== activePageIndex ? p : {
+      ...p,
+      annotations: p.annotations.map(a => (a.id === annId ? { ...a, holes: [] } : a)),
+    }));
+    this.setState({ pages: pages2, history });
+  }
+
+  setCalibValue(v) { this.setState(s => ({ calibInput: { ...s.calibInput, value: v } })); }
+  confirmCalibration() {
+    const { calibInput, pages, activePageIndex } = this.state;
+    if (!calibInput) return;
+    const val = parseFloat(calibInput.value);
+    if (!val || val <= 0) return;
+    const [p1, p2] = calibInput.points;
+    const pxDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const ppu = pxDist / val;
+    const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, scale: { ppu, value: val } } : p));
+    this.setState({ pages: pages2, calibInput: null, activeTool: 'line' });
+  }
+  cancelCalibInput() { this.setState({ calibInput: null }); }
+
+  setFormValue(v) { this.setState(s => ({ activeForm: { ...s.activeForm, value: v } })); }
+  attachFormPhoto(file) {
+    const reader = new FileReader();
+    reader.onload = () => this.setState(s => ({ activeForm: { ...s.activeForm, photo: reader.result } }));
+    reader.readAsDataURL(file);
+  }
+  saveForm() {
+    const { activeForm, pages, activePageIndex } = this.state;
+    if (!activeForm) return;
+    const pages2 = pages.map((p, i) => {
+      if (i !== activePageIndex) return p;
+      return {
+        ...p,
+        annotations: p.annotations.map(a => {
+          if (a.id !== activeForm.annId) return a;
+          if (activeForm.kind === 'note') return { ...a, note: activeForm.value, photo: activeForm.photo || a.photo };
+          if (activeForm.kind === 'substrate') return { ...a, substrate: activeForm.value };
+          return { ...a, label: activeForm.value };
+        }),
+      };
+    });
+    this.setState({ pages: pages2, activeForm: null });
+  }
+  cancelForm() {
+    const { activeForm, pages, activePageIndex } = this.state;
+    if (!activeForm) return;
+    const pages2 = pages.map((p, i) => {
+      if (i !== activePageIndex) return p;
+      const ann = p.annotations.find(a => a.id === activeForm.annId);
+      const isEmpty = ann && (
+        (activeForm.kind === 'note' && !ann.note && !activeForm.value) ||
+        (activeForm.kind === 'text' && !ann.label && !activeForm.value)
+      );
+      if (isEmpty) return { ...p, annotations: p.annotations.filter(a => a.id !== activeForm.annId) };
+      return p;
+    });
+    this.setState({ pages: pages2, activeForm: null });
+  }
+  editAnnotation(ann) {
+    const kind = ann.type === 'point' ? 'note' : ann.type === 'area' ? 'substrate' : 'text';
+    const value = kind === 'note' ? (ann.note || '') : kind === 'substrate' ? (ann.substrate || '') : (ann.label || '');
+    this.setState({ activeForm: { annId: ann.id, kind, value, photo: ann.photo } });
+  }
+  deleteAnnotation(annId) {
+    const { pages, activePageIndex } = this.state;
+    const history = this.pushHistory();
+    const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, annotations: p.annotations.filter(a => a.id !== annId) } : p));
+    this.setState({ pages: pages2, history });
+  }
+
+  onCanvasMouseDown(e) {
+    if (this.state.activeTool !== 'pan') return;
+    const el = this.canvasScrollRef.current;
+    if (!el) return;
+    e.preventDefault();
+    const start = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+    this.setState({ isPanning: true });
+    const onMove = (ev) => {
+      el.scrollLeft = start.left - (ev.clientX - start.x);
+      el.scrollTop = start.top - (ev.clientY - start.y);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      this.setState({ isPanning: false });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  zoomIn() { this.setState(s => ({ zoom: Math.min(3, Math.round((s.zoom + 0.25) * 100) / 100) })); }
+  zoomOut() { this.setState(s => ({ zoom: Math.max(0.5, Math.round((s.zoom - 0.25) * 100) / 100) })); }
+  resetZoom() { this.setState({ zoom: 1 }); }
+
+  setTool(id) {
+    const page = this.state.pages[this.state.activePageIndex];
+    const unlocked = page && (page.scale || page.demoMode);
+    if (id !== 'calibrate' && id !== 'pan' && !unlocked) return;
+    this.setState({ activeTool: id, draft: null, calibDraft: null, excludeTarget: null });
+  }
+  setDemoMode(val) {
+    const { pages, activePageIndex } = this.state;
+    const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, demoMode: val } : p));
+    this.setState({ pages: pages2 });
+  }
+  selectPage(idx) {
+    const page = this.state.pages[idx];
+    this.setState({ activePageIndex: idx, activeTool: page && page.scale ? 'line' : 'calibrate', draft: null, calibDraft: null, calibInput: null, activeForm: null, excludeTarget: null });
+  }
+
+  goToWorkspace() {
+    if (this.state.pages.length) this.setState({ mode: 'workspace', activePageIndex: 0, activeTool: this.state.pages[0].scale ? 'line' : 'calibrate' });
+  }
+  goToReport() { this.setState({ mode: 'report' }); }
+  backToEditor() { this.setState({ mode: 'workspace' }); }
+  printReport() { window.print(); }
+  updateJob(field, val) { this.setState(s => ({ job: { ...s.job, [field]: val } })); }
+  setBreachStart(val) {
+    const { pages, activePageIndex } = this.state;
+    const pages2 = pages.map((p, i) => (i === activePageIndex ? { ...p, breachStartNumber: val } : p));
+    this.setState({ pages: pages2 });
+  }
+
+  renderVals() {
+    const { mode, pages, activePageIndex, activeTool, draft, calibDraft, calibInput, activeForm, job, zoom } = this.state;
+    const activePage = pages[activePageIndex] || null;
+    const activePageEnriched = activePage ? this.enrichPage(activePage) : this.enrichPage({ naturalW: 3, naturalH: 2, annotations: [], scale: null, img: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7' });
+    const hasScale = !!(activePage && activePage.scale);
+
+    const TOOLS = [
+      { id: 'calibrate', label: 'Set Scale', color: '#ea580c' },
+      { id: 'line', label: 'Line', color: '#2563eb' },
+      { id: 'area', label: 'Area', color: '#16a34a' },
+      { id: 'point', label: 'Breach', color: '#dc2626' },
+      { id: 'text', label: 'Label', color: '#334155' },
+      { id: 'pan', label: 'Pan', color: '#64748b' },
+    ];
+    const unlocked = hasScale || (activePage && activePage.demoMode);
+    const toolButtons = TOOLS.map(t => ({
+      ...t,
+      disabled: t.id !== 'calibrate' && t.id !== 'pan' && !unlocked,
+      bg: activeTool === t.id ? '#1e293b' : 'transparent',
+      onClick: () => this.setTool(t.id),
+    }));
+
+    const pageTabs = pages.map((p, i) => ({
+      id: p.id, name: p.name, img: p.img,
+      bg: i === activePageIndex ? '#fff7ed' : '#fff',
+      border: i === activePageIndex ? '#ea580c' : '#e2e8f0',
+      scaleColor: p.scale ? '#16a34a' : '#cbd5e1',
+      onSelect: () => this.selectPage(i),
+    }));
+
+    const uploadPages = pages.map(p => ({ ...p, onRemove: () => this.removePage(p.id) }));
+
+    const draftPreviewPts = draft ? [...draft.points, ...(draft.mouse ? [draft.mouse] : [])].map(p => p.x + ',' + p.y).join(' ') : '';
+    const draftCanFinish = draft ? ((draft.type === 'area' || draft.type === 'exclude') ? draft.points.length >= 3 : draft.points.length >= 2) : false;
+
+    const draftIsArea = !!(draft && draft.type === 'area');
+    const draftIsExclude = !!(draft && draft.type === 'exclude');
+    const calibFirstPoint = calibDraft ? calibDraft.points[0] : { x: 0, y: 0 };
+    const calibLinePts = calibDraft && calibDraft.mouse ? `${calibFirstPoint.x},${calibFirstPoint.y} ${calibDraft.mouse.x},${calibDraft.mouse.y}` : '';
+
+    const calibInputLinePts = calibInput ? `${calibInput.points[0].x},${calibInput.points[0].y} ${calibInput.points[1].x},${calibInput.points[1].y}` : '';
+    const calibInputLeftPct = calibInput ? (((calibInput.points[0].x + calibInput.points[1].x) / 2 / 1000) * 100) + '%' : '0%';
+    const calibInputTopPct = calibInput ? (((calibInput.points[0].y + calibInput.points[1].y) / 2 / activePageEnriched.vbH) * 100) + '%' : '0%';
+
+    let formAnnotation = null, formLeftPct = '50%', formTopPct = '50%';
+    if (activeForm) {
+      formAnnotation = activePageEnriched.annotations.find(a => a.id === activeForm.annId);
+      if (formAnnotation) { formLeftPct = formAnnotation.leftPct; formTopPct = formAnnotation.topPct; }
+    }
+
+    const instructionMap = {
+      calibrate: hasScale ? 'Recalibrate: click two points a known distance apart.' : 'Click two points a known distance apart (e.g. a wall or grid line), then enter the real length.',
+      line: 'Click to place points along the run. Double-click or press Finish to complete.',
+      area: 'Click to trace the region. Click back near your starting point (or press Finish) to close it.',
+      point: 'Click on the drawing to flag a breach or area of concern.',
+      text: 'Click on the drawing to place a text callout.',
+      pan: 'Drag to move around the drawing.',
+      exclude: 'Trace the untestable area (e.g. a hatch). Click back near your start point (or press Finish) to exclude it from the m² total.',
+    };
+
+    const reportPages = pages.map(p => this.enrichPage(p));
+    const overallLength = reportPages.reduce((s, p) => s + p.totalLength, 0);
+    const overallArea = reportPages.reduce((s, p) => s + p.totalArea, 0);
+    const overallBreach = reportPages.reduce((s, p) => s + p.breachCount, 0);
+
+    return {
+      isUpload: mode === 'upload', isWorkspace: mode === 'workspace', isReport: mode === 'report',
+      pages, pageTabs, uploadPages, hasPages: pages.length > 0,
+      activePageEnriched, hasScale, activeTool, toolButtons,
+      instructionText: instructionMap[activeTool] || '',
+      svgRef: this.svgRef, fileInputRef: this.fileInputRef,
+      onSvgClick: e => this.onSvgClick(e), onSvgMouseMove: e => this.onSvgMouseMove(e), onSvgDoubleClick: e => this.onSvgDoubleClick(e),
+      canvasCursor: activeTool === 'pan' ? 'inherit' : 'crosshair',
+      canvasScrollRef: this.canvasScrollRef,
+      onCanvasMouseDown: e => this.onCanvasMouseDown(e),
+      containerCursor: activeTool === 'pan' ? (this.state.isPanning ? 'grabbing' : 'grab') : 'default',
+      draftActive: !!draft, draftPreviewPts, draftIsArea, draftIsExclude, draftIsClosedShape: draftIsArea || draftIsExclude, draftCanFinish,
+      draftNearStart: !!(draft && draft.nearStart), draftStartPoint: draft ? draft.points[0] : { x: 0, y: 0 },
+      finishDraft: () => this.finishDraft(), cancelDraft: () => this.cancelDraft(),
+      calibActive: !!calibDraft, calibFirstPoint, calibLinePts,
+      calibInputActive: !!calibInput, calibInput: calibInput || { value: '' }, calibInputLinePts, calibInputLeftPct, calibInputTopPct,
+      onCalibValueChange: e => this.setCalibValue(e.target.value),
+      confirmCalibration: () => this.confirmCalibration(), cancelCalibInput: () => this.cancelCalibInput(),
+      formActive: !!activeForm, activeForm: activeForm || { value: '' },
+      formIsNote: !!(activeForm && activeForm.kind === 'note'),
+      formIsSubstrate: !!(activeForm && activeForm.kind === 'substrate'),
+      formTitle: activeForm && activeForm.kind === 'note' ? 'Breach / concern note' : activeForm && activeForm.kind === 'substrate' ? 'Substrate & membrane type' : 'Callout text',
+      formPlaceholder: activeForm && activeForm.kind === 'note' ? 'Describe the issue…' : 'Label text…',
+      formLeftPct, formTopPct,
+      onFormValueChange: e => this.setFormValue(e.target.value),
+      onPhotoChange: e => { if (e.target.files[0]) this.attachFormPhoto(e.target.files[0]); },
+      saveForm: () => this.saveForm(), cancelForm: () => this.cancelForm(),
+      onFilesSelected: e => this.onFilesSelected(e), triggerFilePicker: () => this.triggerFilePicker(),
+      job,
+      onClientNameChange: e => this.updateJob('clientName', e.target.value),
+      onAddressChange: e => this.updateJob('address', e.target.value),
+      onReportTitleChange: e => this.updateJob('reportTitle', e.target.value),
+      onCompanyChange: e => this.updateJob('company', e.target.value),
+      onDateChange: e => this.updateJob('date', e.target.value),
+      goToWorkspace: () => this.goToWorkspace(), goToReport: () => this.goToReport(),
+      backToEditor: () => this.backToEditor(), printReport: () => this.printReport(),
+      reportPages, overallLengthLabel: overallLength.toFixed(2) + ' m', overallAreaLabel: overallArea.toFixed(2) + ' m\u00b2',
+      overallBreach, pageCount: pages.length, reportYear: new Date().getFullYear(),
+      reportSubtitle: [job.clientName, job.address, job.date].filter(Boolean).join(' · '),
+      dropzoneLabel: this.state.processing ? 'Processing files…' : 'Click to choose files',
+      hasActiveImg: !!(activePage && activePage.img),
+      breachStartValue: (activePage && activePage.breachStartNumber) || 1,
+      onBreachStartChange: e => this.setBreachStart(e.target.value),
+      canUndo: this.state.history.length > 0, undo: () => this.undo(),
+      showBreachNumbers: this.props.showBreachNumbers ?? true,
+      setMeasureMode: () => this.setDemoMode(false), setDemoModeOn: () => this.setDemoMode(true),
+      measureBg: !activePageEnriched.demoMode ? '#0f172a' : '#fff', measureColor: !activePageEnriched.demoMode ? '#fff' : '#475569',
+      demoBg: activePageEnriched.demoMode ? '#0f172a' : '#fff', demoColor: activePageEnriched.demoMode ? '#fff' : '#475569',
+      hasAreaAnnotations: activePageEnriched.annotations.some(a => a.isArea),
+      substrateLegend: [
+        { label: 'Plywood', color: '#ccff00' },
+        { label: 'Concrete', color: '#00e5ff' },
+        { label: 'Warm Roof', color: '#ff3c00' },
+        { label: 'Not set', color: '#39ff14' },
+      ],
+      zoomPct: Math.round(zoom * 100) + '%', canvasWidthPx: Math.round(1100 * zoom) + 'px',
+      zoomIn: () => this.zoomIn(), zoomOut: () => this.zoomOut(), resetZoom: () => this.resetZoom(),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
