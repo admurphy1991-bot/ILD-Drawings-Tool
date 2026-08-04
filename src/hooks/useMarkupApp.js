@@ -2,38 +2,38 @@ import { useRef, useState, useEffect } from 'react'
 import { enrichPage, blankPage } from '../lib/enrichPage.js'
 import { dist } from '../lib/geometry.js'
 import { filesToPages } from '../lib/pdfPages.js'
+import { loadStore, persistStore, newProjectId, defaultDateLabel } from '../lib/projectsStore.js'
 
-const STORAGE_KEY = 'ild_drawings_tool_state_v1'
 const SHOW_BREACH_NUMBERS = true
 
-function loadSaved() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw)
-  } catch {
-    return null
+function buildJob({ reportTitle, clientName, address } = {}) {
+  return {
+    clientName: clientName || '',
+    address: address || '',
+    reportTitle: reportTitle || 'Drawing Markup Report',
+    company: 'ILD',
+    date: defaultDateLabel(),
   }
 }
 
-const DEFAULT_JOB = {
-  clientName: '',
-  address: '',
-  reportTitle: 'Drawing Markup Report',
-  company: 'ILD',
-  date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+function initialProject(store) {
+  const project = store.activeProjectId ? store.projects[store.activeProjectId] : null
+  return project || null
 }
 
 export function useMarkupApp() {
-  const saved = loadSaved()
+  const initialStore = loadStore()
+  const initialActiveProject = initialProject(initialStore)
 
   const svgRef = useRef(null)
   const fileInputRef = useRef(null)
   const canvasScrollRef = useRef(null)
 
-  const [mode, setMode] = useState(saved?.mode === 'workspace' ? 'workspace' : saved?.mode === 'report' ? 'report' : (saved?.pages?.length ? 'workspace' : 'upload'))
-  const [pages, setPages] = useState(saved?.pages || [])
-  const [activePageIndex, setActivePageIndex] = useState(saved?.activePageIndex || 0)
+  const [store, setStore] = useState(initialStore)
+  const [activeProjectId, setActiveProjectId] = useState(initialStore.activeProjectId || null)
+  const [mode, setMode] = useState(initialActiveProject ? (initialActiveProject.pages.length ? 'workspace' : 'upload') : 'projects')
+  const [pages, setPages] = useState(initialActiveProject?.pages || [])
+  const [activePageIndex, setActivePageIndex] = useState(0)
   const [activeTool, setActiveTool] = useState('calibrate')
   const [draft, setDraft] = useState(null)
   const [excludeTarget, setExcludeTarget] = useState(null)
@@ -44,16 +44,88 @@ export function useMarkupApp() {
   const [zoom, setZoom] = useState(1)
   const [isPanning, setIsPanning] = useState(false)
   const [history, setHistory] = useState([])
-  const [job, setJob] = useState(saved?.job || DEFAULT_JOB)
+  const [job, setJob] = useState(initialActiveProject?.job || buildJob())
 
-  // ── Autosave ─────────────────────────────────────────────────────────────
+  // ── Autosave (scoped to the active project) ─────────────────────────────
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, pages, activePageIndex, job }))
-    } catch {
-      // storage full/unavailable — autosave is a safety net, not a hard requirement
+    if (!activeProjectId) return
+    setStore((s) => {
+      if (!s.projects[activeProjectId]) return s
+      const next = {
+        ...s,
+        activeProjectId,
+        projects: {
+          ...s.projects,
+          [activeProjectId]: { ...s.projects[activeProjectId], pages, job, updatedAt: Date.now() },
+        },
+      }
+      persistStore(next)
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages, job, activeProjectId])
+
+  function resetEditorState() {
+    setActivePageIndex(0)
+    setActiveTool('calibrate')
+    setDraft(null)
+    setCalibDraft(null)
+    setCalibInput(null)
+    setActiveForm(null)
+    setExcludeTarget(null)
+    setHistory([])
+    setZoom(1)
+  }
+
+  // ── Projects ─────────────────────────────────────────────────────────────
+  function createProject({ reportTitle, clientName, address }) {
+    const id = newProjectId()
+    const now = Date.now()
+    const newJob = buildJob({ reportTitle, clientName, address })
+    const project = { id, createdAt: now, updatedAt: now, job: newJob, pages: [] }
+    const next = { activeProjectId: id, projects: { ...store.projects, [id]: project } }
+    persistStore(next)
+    setStore(next)
+    setActiveProjectId(id)
+    setPages([])
+    setJob(newJob)
+    resetEditorState()
+    setMode('upload')
+  }
+
+  function selectProject(id) {
+    const project = store.projects[id]
+    if (!project) return
+    const next = { ...store, activeProjectId: id }
+    persistStore(next)
+    setStore(next)
+    setActiveProjectId(id)
+    setPages(project.pages)
+    setJob(project.job)
+    resetEditorState()
+    setMode(project.pages.length ? 'workspace' : 'upload')
+  }
+
+  function goToProjects() {
+    setMode('projects')
+  }
+
+  function deleteProject(id) {
+    if (!window.confirm('Delete this project and all its drawings? This cannot be undone.')) return
+    const remainingProjects = { ...store.projects }
+    delete remainingProjects[id]
+    const stillActive = activeProjectId === id ? null : activeProjectId
+    const next = { activeProjectId: stillActive, projects: remainingProjects }
+    persistStore(next)
+    setStore(next)
+    if (activeProjectId === id) {
+      setActiveProjectId(null)
+      setPages([])
+      setJob(buildJob())
+      resetEditorState()
+      setMode('projects')
     }
-  }, [mode, pages, activePageIndex, job])
+  }
 
   // ── Upload ───────────────────────────────────────────────────────────────
   async function handleFiles(fileList) {
@@ -433,10 +505,27 @@ export function useMarkupApp() {
   const overallArea = reportPages.reduce((s, p) => s + p.totalArea, 0)
   const overallBreach = reportPages.reduce((s, p) => s + p.breachCount, 0)
 
+  const projectList = Object.values(store.projects)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map((p) => ({
+      id: p.id,
+      name: p.job.reportTitle || 'Untitled project',
+      clientName: p.job.clientName,
+      address: p.job.address,
+      pageCount: p.pages.length,
+      thumbnail: p.pages[0]?.img || null,
+      updatedAt: p.updatedAt,
+      onSelect: () => selectProject(p.id),
+      onDelete: () => deleteProject(p.id),
+    }))
+
   return {
     // mode
-    mode, isUpload: mode === 'upload', isWorkspace: mode === 'workspace', isReport: mode === 'report',
+    mode, isProjects: mode === 'projects', isUpload: mode === 'upload', isWorkspace: mode === 'workspace', isReport: mode === 'report',
     goToWorkspace, goToReport, backToEditor, printReport,
+    // projects
+    projectList, createProject, selectProject, goToProjects, deleteProject,
+    hasActiveProject: !!activeProjectId,
     // pages / upload
     pages, hasPages: pages.length > 0,
     uploadPages: pages.map((p) => ({ ...p, onRemove: () => removePage(p.id) })),
