@@ -5,7 +5,7 @@ import { filesToPages } from '../lib/pdfPages.js'
 import { uploadToBlob } from '../lib/blobUpload.js'
 import {
   fetchProjects, createProjectApi, updateProjectApi, deleteProjectApi,
-  newProjectId, defaultDateLabel, getLastActiveProjectId, setLastActiveProjectId,
+  newProjectId, defaultDateLabel,
 } from '../lib/projectsApi.js'
 
 const SHOW_BREACH_NUMBERS = true
@@ -51,6 +51,8 @@ export function useMarkupApp() {
   const pendingCreatesRef = useRef({})
 
   // ── Initial load from the database ──────────────────────────────────────
+  // Always lands on the Projects list — it never auto-resumes into whatever
+  // project was open last.
   useEffect(() => {
     let cancelled = false
     fetchProjects()
@@ -59,14 +61,6 @@ export function useMarkupApp() {
         const projects = {}
         for (const p of list) projects[p.id] = p
         setStore({ projects })
-        const lastId = getLastActiveProjectId()
-        const project = lastId ? projects[lastId] : null
-        if (project) {
-          setActiveProjectId(project.id)
-          setPages(project.pages)
-          setJob(project.job)
-          setMode(project.pages.length ? 'workspace' : 'upload')
-        }
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || 'Failed to load projects')
@@ -122,7 +116,6 @@ export function useMarkupApp() {
     const project = { id, job: newJob, pages: [], updatedAt: new Date().toISOString() }
     setStore((s) => ({ ...s, projects: { ...s.projects, [id]: project } }))
     setActiveProjectId(id)
-    setLastActiveProjectId(id)
     setPages([])
     setJob(newJob)
     resetEditorState()
@@ -134,7 +127,6 @@ export function useMarkupApp() {
     const project = store.projects[id]
     if (!project) return
     setActiveProjectId(id)
-    setLastActiveProjectId(id)
     setPages(project.pages)
     setJob(project.job)
     resetEditorState()
@@ -152,7 +144,6 @@ export function useMarkupApp() {
     setStore((s) => ({ ...s, projects: remainingProjects }))
     if (activeProjectId === id) {
       setActiveProjectId(null)
-      setLastActiveProjectId(null)
       setPages([])
       setJob(buildJob())
       resetEditorState()

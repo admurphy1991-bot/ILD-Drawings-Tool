@@ -1,5 +1,3 @@
-const ACTIVE_PROJECT_KEY = 'ild_drawings_tool_active_project_v1'
-
 async function parseOrThrow(res) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -43,23 +41,4 @@ export function newProjectId() {
 
 export function defaultDateLabel() {
   return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-}
-
-// "Last opened project" is a per-device UI preference, not shared project data,
-// so it stays in localStorage rather than round-tripping to the database.
-export function getLastActiveProjectId() {
-  try {
-    return localStorage.getItem(ACTIVE_PROJECT_KEY)
-  } catch {
-    return null
-  }
-}
-
-export function setLastActiveProjectId(id) {
-  try {
-    if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, id)
-    else localStorage.removeItem(ACTIVE_PROJECT_KEY)
-  } catch {
-    // best-effort only
-  }
 }
