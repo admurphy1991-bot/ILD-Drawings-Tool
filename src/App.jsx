@@ -7,6 +7,26 @@ import ReportView from './components/ReportView.jsx'
 export default function App() {
   const vm = useMarkupApp()
 
+  if (vm.loading) {
+    return (
+      <div style={centeredScreenStyle}>
+        <div style={{ fontSize: 14, color: '#64748b' }}>Loading projects…</div>
+      </div>
+    )
+  }
+
+  if (vm.loadError) {
+    return (
+      <div style={centeredScreenStyle}>
+        <div style={{ maxWidth: 360, textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Couldn't load projects</div>
+          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>{vm.loadError}</div>
+          <button onClick={() => window.location.reload()} style={primaryBtnStyle}>Retry</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', fontFamily: "'Public Sans',sans-serif", background: '#eef0f3', color: '#0f172a', overflow: 'hidden' }}>
       <div className="no-print" style={headerStyle}>
@@ -19,6 +39,9 @@ export default function App() {
               <button onClick={vm.goToProjects} style={backLinkStyle}>← All Projects</button>
               <span style={{ fontSize: 12, color: '#94a3b8' }}>·</span>
               <span style={projectNameStyle}>{vm.job.reportTitle}</span>
+              {vm.saveStatusLabel && (
+                <span style={{ fontSize: 11, color: vm.saveStatus === 'error' ? '#f87171' : '#94a3b8' }}>· {vm.saveStatusLabel}</span>
+              )}
             </>
           )}
         </div>
@@ -50,6 +73,10 @@ export default function App() {
   )
 }
 
+const centeredScreenStyle = {
+  height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  fontFamily: "'Public Sans',sans-serif", background: '#eef0f3', color: '#0f172a',
+}
 const headerStyle = {
   height: 56, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   padding: '0 20px', background: '#0f172a', color: '#fff',

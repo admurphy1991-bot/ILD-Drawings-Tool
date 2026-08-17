@@ -1,10 +1,15 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url'
+import { uploadToBlob } from './blobUpload.js'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 function newPageId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2)
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
 }
 
 export async function pdfFileToPages(f) {
@@ -20,10 +25,13 @@ export async function pdfFileToPages(f) {
     canvas.height = viewport.height
     const ctx = canvas.getContext('2d')
     await page.render({ canvasContext: ctx, viewport }).promise
+    const id = newPageId()
+    const blob = await canvasToBlob(canvas)
+    const img = await uploadToBlob(blob, `${id}.png`)
     pages.push({
-      id: newPageId(),
+      id,
       name: pdf.numPages > 1 ? `${baseName} — p.${i}` : baseName,
-      img: canvas.toDataURL('image/png'),
+      img,
       naturalW: canvas.width,
       naturalH: canvas.height,
       scale: null,
@@ -34,21 +42,21 @@ export async function pdfFileToPages(f) {
 }
 
 export async function imageFileToPage(f) {
-  const dataUrl = await new Promise((res, rej) => {
-    const r = new FileReader()
-    r.onload = () => res(r.result)
-    r.onerror = rej
-    r.readAsDataURL(f)
-  })
   const dims = await new Promise((res) => {
+    const objUrl = URL.createObjectURL(f)
     const img = new Image()
-    img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight })
-    img.src = dataUrl
+    img.onload = () => {
+      res({ w: img.naturalWidth, h: img.naturalHeight })
+      URL.revokeObjectURL(objUrl)
+    }
+    img.src = objUrl
   })
+  const id = newPageId()
+  const img = await uploadToBlob(f, `${id}-${f.name}`)
   return {
-    id: newPageId(),
+    id,
     name: f.name.replace(/\.[^.]+$/, ''),
-    img: dataUrl,
+    img,
     naturalW: dims.w,
     naturalH: dims.h,
     scale: null,

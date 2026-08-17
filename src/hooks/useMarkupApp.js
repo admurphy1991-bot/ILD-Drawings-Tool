@@ -2,7 +2,11 @@ import { useRef, useState, useEffect } from 'react'
 import { enrichPage, blankPage } from '../lib/enrichPage.js'
 import { dist } from '../lib/geometry.js'
 import { filesToPages } from '../lib/pdfPages.js'
-import { loadStore, persistStore, newProjectId, defaultDateLabel } from '../lib/projectsStore.js'
+import { uploadToBlob } from '../lib/blobUpload.js'
+import {
+  fetchProjects, createProjectApi, updateProjectApi, deleteProjectApi,
+  newProjectId, defaultDateLabel, getLastActiveProjectId, setLastActiveProjectId,
+} from '../lib/projectsApi.js'
 
 const SHOW_BREACH_NUMBERS = true
 
@@ -16,23 +20,17 @@ function buildJob({ reportTitle, clientName, address } = {}) {
   }
 }
 
-function initialProject(store) {
-  const project = store.activeProjectId ? store.projects[store.activeProjectId] : null
-  return project || null
-}
-
 export function useMarkupApp() {
-  const initialStore = loadStore()
-  const initialActiveProject = initialProject(initialStore)
-
   const svgRef = useRef(null)
   const fileInputRef = useRef(null)
   const canvasScrollRef = useRef(null)
 
-  const [store, setStore] = useState(initialStore)
-  const [activeProjectId, setActiveProjectId] = useState(initialStore.activeProjectId || null)
-  const [mode, setMode] = useState(initialActiveProject ? (initialActiveProject.pages.length ? 'workspace' : 'upload') : 'projects')
-  const [pages, setPages] = useState(initialActiveProject?.pages || [])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [store, setStore] = useState({ projects: {} })
+  const [activeProjectId, setActiveProjectId] = useState(null)
+  const [mode, setMode] = useState('projects')
+  const [pages, setPages] = useState([])
   const [activePageIndex, setActivePageIndex] = useState(0)
   const [activeTool, setActiveTool] = useState('calibrate')
   const [draft, setDraft] = useState(null)
@@ -44,27 +42,65 @@ export function useMarkupApp() {
   const [zoom, setZoom] = useState(1)
   const [isPanning, setIsPanning] = useState(false)
   const [history, setHistory] = useState([])
-  const [job, setJob] = useState(initialActiveProject?.job || buildJob())
+  const [job, setJob] = useState(buildJob())
+  const [saveStatus, setSaveStatus] = useState('idle')
   const [excludedReportPageIds, setExcludedReportPageIds] = useState(() => new Set())
+  // Tracks in-flight "create project" requests so the autosave PUT below can wait
+  // for the POST to land first, instead of racing it and 404ing on a row that
+  // doesn't exist yet.
+  const pendingCreatesRef = useRef({})
 
-  // ── Autosave (scoped to the active project) ─────────────────────────────
+  // ── Initial load from the database ──────────────────────────────────────
   useEffect(() => {
-    if (!activeProjectId) return
+    let cancelled = false
+    fetchProjects()
+      .then((list) => {
+        if (cancelled) return
+        const projects = {}
+        for (const p of list) projects[p.id] = p
+        setStore({ projects })
+        const lastId = getLastActiveProjectId()
+        const project = lastId ? projects[lastId] : null
+        if (project) {
+          setActiveProjectId(project.id)
+          setPages(project.pages)
+          setJob(project.job)
+          setMode(project.pages.length ? 'workspace' : 'upload')
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err.message || 'Failed to load projects')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  // ── Autosave (scoped to the active project, debounced) ──────────────────
+  useEffect(() => {
+    if (!activeProjectId || loading) return
     setStore((s) => {
       if (!s.projects[activeProjectId]) return s
-      const next = {
+      return {
         ...s,
-        activeProjectId,
         projects: {
           ...s.projects,
-          [activeProjectId]: { ...s.projects[activeProjectId], pages, job, updatedAt: Date.now() },
+          [activeProjectId]: { ...s.projects[activeProjectId], pages, job, updatedAt: new Date().toISOString() },
         },
       }
-      persistStore(next)
-      return next
     })
+    setSaveStatus('saving')
+    const timer = setTimeout(() => {
+      const pendingCreate = pendingCreatesRef.current[activeProjectId] || Promise.resolve()
+      pendingCreate
+        .then(() => updateProjectApi(activeProjectId, { job, pages }))
+        .then(() => setSaveStatus('saved'))
+        .catch(() => setSaveStatus('error'))
+    }, 800)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pages, job, activeProjectId])
+  }, [pages, job, activeProjectId, loading])
 
   function resetEditorState() {
     setActivePageIndex(0)
@@ -82,26 +118,23 @@ export function useMarkupApp() {
   // ── Projects ─────────────────────────────────────────────────────────────
   function createProject({ reportTitle, clientName, address }) {
     const id = newProjectId()
-    const now = Date.now()
     const newJob = buildJob({ reportTitle, clientName, address })
-    const project = { id, createdAt: now, updatedAt: now, job: newJob, pages: [] }
-    const next = { activeProjectId: id, projects: { ...store.projects, [id]: project } }
-    persistStore(next)
-    setStore(next)
+    const project = { id, job: newJob, pages: [], updatedAt: new Date().toISOString() }
+    setStore((s) => ({ ...s, projects: { ...s.projects, [id]: project } }))
     setActiveProjectId(id)
+    setLastActiveProjectId(id)
     setPages([])
     setJob(newJob)
     resetEditorState()
     setMode('upload')
+    pendingCreatesRef.current[id] = createProjectApi({ id, job: newJob }).catch(() => setSaveStatus('error'))
   }
 
   function selectProject(id) {
     const project = store.projects[id]
     if (!project) return
-    const next = { ...store, activeProjectId: id }
-    persistStore(next)
-    setStore(next)
     setActiveProjectId(id)
+    setLastActiveProjectId(id)
     setPages(project.pages)
     setJob(project.job)
     resetEditorState()
@@ -116,17 +149,16 @@ export function useMarkupApp() {
     if (!window.confirm('Delete this project and all its drawings? This cannot be undone.')) return
     const remainingProjects = { ...store.projects }
     delete remainingProjects[id]
-    const stillActive = activeProjectId === id ? null : activeProjectId
-    const next = { activeProjectId: stillActive, projects: remainingProjects }
-    persistStore(next)
-    setStore(next)
+    setStore((s) => ({ ...s, projects: remainingProjects }))
     if (activeProjectId === id) {
       setActiveProjectId(null)
+      setLastActiveProjectId(null)
       setPages([])
       setJob(buildJob())
       resetEditorState()
       setMode('projects')
     }
+    deleteProjectApi(id).catch(() => setSaveStatus('error'))
   }
 
   // ── Upload ───────────────────────────────────────────────────────────────
@@ -342,9 +374,9 @@ export function useMarkupApp() {
     setActiveForm((s) => ({ ...s, qty: v }))
   }
   function attachFormPhoto(file) {
-    const reader = new FileReader()
-    reader.onload = () => setActiveForm((s) => ({ ...s, photo: reader.result }))
-    reader.readAsDataURL(file)
+    uploadToBlob(file, `breach-${Date.now()}-${file.name}`)
+      .then((url) => setActiveForm((s) => ({ ...s, photo: url })))
+      .catch(() => setSaveStatus('error'))
   }
   function saveForm() {
     if (!activeForm) return
@@ -529,7 +561,7 @@ export function useMarkupApp() {
   }))
 
   const projectList = Object.values(store.projects)
-    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     .map((p) => ({
       id: p.id,
       name: p.job.reportTitle || 'Untitled project',
@@ -543,6 +575,9 @@ export function useMarkupApp() {
     }))
 
   return {
+    // data loading
+    loading, loadError,
+    saveStatus, saveStatusLabel: saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Save failed' : '',
     // mode
     mode, isProjects: mode === 'projects', isUpload: mode === 'upload', isWorkspace: mode === 'workspace', isReport: mode === 'report',
     goToWorkspace, goToReport, backToEditor, printReport,
