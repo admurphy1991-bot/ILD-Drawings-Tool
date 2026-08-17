@@ -92,7 +92,15 @@ export default function CanvasArea({ vm }) {
                 <option value="Warm Roof">Warm Roof</option>
               </select>
             ) : (
-              <textarea value={vm.activeForm.value} onChange={vm.onFormValueChange} placeholder={vm.formPlaceholder} rows={3} style={textareaStyle} />
+              <>
+                {vm.formIsNote && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <label style={{ fontSize: 12, color: '#475569' }}>Number of breaches here</label>
+                    <input type="number" min="1" value={vm.activeForm.qty ?? 1} onChange={vm.onFormQtyChange} style={qtyInputStyle} />
+                  </div>
+                )}
+                <textarea value={vm.activeForm.value} onChange={vm.onFormValueChange} placeholder={vm.formPlaceholder} rows={3} style={textareaStyle} />
+              </>
             )}
             <div style={popoverActionsStyle}>
               <button onClick={vm.cancelForm} style={popoverCancelBtnStyle}>Cancel</button>
@@ -124,5 +132,6 @@ const popoverActionsStyle = { display: 'flex', gap: 8, justifyContent: 'flex-end
 const popoverCancelBtnStyle = { background: 'transparent', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 4, fontSize: 12, cursor: 'pointer' }
 const popoverSaveBtnStyle = { background: '#ea580c', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }
 const numInputStyle = { width: 90, padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 }
+const qtyInputStyle = { width: 56, padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 }
 const selectStyle = { width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, fontFamily: 'inherit', background: '#fff' }
 const textareaStyle = { width: '100%', padding: 8, border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }

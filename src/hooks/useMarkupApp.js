@@ -45,6 +45,7 @@ export function useMarkupApp() {
   const [isPanning, setIsPanning] = useState(false)
   const [history, setHistory] = useState([])
   const [job, setJob] = useState(initialActiveProject?.job || buildJob())
+  const [excludedReportPageIds, setExcludedReportPageIds] = useState(() => new Set())
 
   // ── Autosave (scoped to the active project) ─────────────────────────────
   useEffect(() => {
@@ -75,6 +76,7 @@ export function useMarkupApp() {
     setExcludeTarget(null)
     setHistory([])
     setZoom(1)
+    setExcludedReportPageIds(new Set())
   }
 
   // ── Projects ─────────────────────────────────────────────────────────────
@@ -277,10 +279,11 @@ export function useMarkupApp() {
     }
     if (activeTool === 'point') {
       const id = 'a' + Date.now() + Math.floor(Math.random() * 1000)
-      const ann = { id, type: 'point', points: [pt], note: '' }
+      const ann = { id, type: 'point', points: [pt], note: '', qty: 1 }
       const h = pushHistory()
       setPages((ps) => ps.map((p, i) => (i === activePageIndex ? { ...p, annotations: [...p.annotations, ann] } : p)))
       setHistory(h)
+      setActiveForm({ annId: id, kind: 'note', value: '', qty: 1 })
       return
     }
     if (activeTool === 'text') {
@@ -335,6 +338,9 @@ export function useMarkupApp() {
   function setFormValue(v) {
     setActiveForm((s) => ({ ...s, value: v }))
   }
+  function setFormQty(v) {
+    setActiveForm((s) => ({ ...s, qty: v }))
+  }
   function attachFormPhoto(file) {
     const reader = new FileReader()
     reader.onload = () => setActiveForm((s) => ({ ...s, photo: reader.result }))
@@ -348,7 +354,7 @@ export function useMarkupApp() {
         ...p,
         annotations: p.annotations.map((a) => {
           if (a.id !== activeForm.annId) return a
-          if (activeForm.kind === 'note') return { ...a, note: activeForm.value, photo: activeForm.photo || a.photo }
+          if (activeForm.kind === 'note') return { ...a, note: activeForm.value, qty: Math.max(1, parseInt(activeForm.qty, 10) || 1), photo: activeForm.photo || a.photo }
           if (activeForm.kind === 'substrate') return { ...a, substrate: activeForm.value }
           return { ...a, label: activeForm.value }
         }),
@@ -362,7 +368,7 @@ export function useMarkupApp() {
       if (i !== activePageIndex) return p
       const ann = p.annotations.find((a) => a.id === activeForm.annId)
       const isEmpty = ann && (
-        (activeForm.kind === 'note' && !ann.note && !activeForm.value) ||
+        (activeForm.kind === 'note' && !ann.note && !activeForm.value && (Math.max(1, parseInt(activeForm.qty, 10) || 1) === 1)) ||
         (activeForm.kind === 'text' && !ann.label && !activeForm.value)
       )
       if (isEmpty) return { ...p, annotations: p.annotations.filter((a) => a.id !== activeForm.annId) }
@@ -373,7 +379,7 @@ export function useMarkupApp() {
   function editAnnotation(ann) {
     const kind = ann.type === 'point' ? 'note' : ann.type === 'area' ? 'substrate' : 'text'
     const value = kind === 'note' ? (ann.note || '') : kind === 'substrate' ? (ann.substrate || '') : (ann.label || '')
-    setActiveForm({ annId: ann.id, kind, value, photo: ann.photo })
+    setActiveForm({ annId: ann.id, kind, value, photo: ann.photo, qty: ann.qty || 1 })
   }
   function deleteAnnotation(annId) {
     const h = pushHistory()
@@ -438,6 +444,16 @@ export function useMarkupApp() {
     }
   }
   function goToReport() { setMode('report') }
+  function toggleReportPage(id) {
+    setExcludedReportPageIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  function selectAllReportPages() { setExcludedReportPageIds(new Set()) }
+  function selectNoReportPages() { setExcludedReportPageIds(new Set(pages.map((p) => p.id))) }
   function backToEditor() { setMode('workspace') }
   function printReport() { window.print() }
   function updateJob(field, val) { setJob((s) => ({ ...s, [field]: val })) }
@@ -501,9 +517,16 @@ export function useMarkupApp() {
   }
 
   const reportPages = pages.map((p) => enrichPage(p))
-  const overallLength = reportPages.reduce((s, p) => s + p.totalLength, 0)
-  const overallArea = reportPages.reduce((s, p) => s + p.totalArea, 0)
-  const overallBreach = reportPages.reduce((s, p) => s + p.breachCount, 0)
+  const selectedReportPages = reportPages.filter((p) => !excludedReportPageIds.has(p.id))
+  const overallLength = selectedReportPages.reduce((s, p) => s + p.totalLength, 0)
+  const overallArea = selectedReportPages.reduce((s, p) => s + p.totalArea, 0)
+  const overallBreach = selectedReportPages.reduce((s, p) => s + p.breachCount, 0)
+  const pageSelection = pages.map((p) => ({
+    id: p.id,
+    name: p.name,
+    included: !excludedReportPageIds.has(p.id),
+    onToggle: () => toggleReportPage(p.id),
+  }))
 
   const projectList = Object.values(store.projects)
     .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -546,12 +569,14 @@ export function useMarkupApp() {
     calibInputActive: !!calibInput, calibInput: calibInput || { value: '' }, calibInputLinePts, calibInputLeftPct, calibInputTopPct,
     onCalibValueChange: (e) => setCalibValue(e.target.value),
     confirmCalibration, cancelCalibInput,
-    formActive: !!activeForm, activeForm: activeForm || { value: '' },
+    formActive: !!activeForm, activeForm: activeForm || { value: '', qty: 1 },
     formIsSubstrate: !!(activeForm && activeForm.kind === 'substrate'),
+    formIsNote: !!(activeForm && activeForm.kind === 'note'),
     formTitle: activeForm && activeForm.kind === 'note' ? 'Breach / concern note' : activeForm && activeForm.kind === 'substrate' ? 'Substrate & membrane type' : 'Callout text',
     formPlaceholder: activeForm && activeForm.kind === 'note' ? 'Describe the issue…' : 'Label text…',
     formLeftPct, formTopPct,
     onFormValueChange: (e) => setFormValue(e.target.value),
+    onFormQtyChange: (e) => setFormQty(e.target.value),
     onPhotoChange: (e) => { if (e.target.files[0]) attachFormPhoto(e.target.files[0]) },
     saveForm, cancelForm,
     undo, canUndo: history.length > 0,
@@ -571,8 +596,10 @@ export function useMarkupApp() {
     // job details
     job, updateJob,
     // report
-    reportPages, overallLengthLabel: overallLength.toFixed(2) + ' m', overallAreaLabel: overallArea.toFixed(2) + ' m²',
-    overallBreach, pageCount: pages.length, reportYear: new Date().getFullYear(),
+    reportPages, selectedReportPages, pageSelection,
+    toggleReportPage, selectAllReportPages, selectNoReportPages,
+    overallLengthLabel: overallLength.toFixed(2) + ' m', overallAreaLabel: overallArea.toFixed(2) + ' m²',
+    overallBreach, pageCount: selectedReportPages.length, reportYear: new Date().getFullYear(),
     reportSubtitle: [job.clientName, job.address, job.date].filter(Boolean).join(' · '),
   }
 }

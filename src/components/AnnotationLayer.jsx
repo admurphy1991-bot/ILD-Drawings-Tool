@@ -4,8 +4,8 @@ export default function AnnotationLayer({ annotations, showBreachNumbers, marker
   return (
     <>
       <defs>
-        <marker id={markerId} markerWidth="5" markerHeight="5" refX="4" refY="2" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L4,2 L0,4 Z" style={{ fill: '#dc2626' }} />
+        <marker id={markerId} markerWidth="4" markerHeight="4" refX="3.2" refY="1.6" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L3.2,1.6 L0,3.2 Z" style={{ fill: '#dc2626', fillOpacity: 0.8 }} />
         </marker>
       </defs>
       {annotations.map((ann) => (
@@ -29,9 +29,9 @@ export default function AnnotationLayer({ annotations, showBreachNumbers, marker
           )}
           {ann.isPoint && (
             <>
-              <line x1={ann.tailX} y1={ann.tailY} x2={ann.labelX} y2={ann.labelY} style={{ stroke: ann.color, strokeWidth: 1.6 }} markerEnd={`url(#${markerId})`} />
-              <line x1={ann.crossX1} y1={ann.crossY1} x2={ann.crossX2} y2={ann.crossY2} style={{ stroke: ann.color, strokeWidth: 2.2 }} />
-              <line x1={ann.crossX3} y1={ann.crossY3} x2={ann.crossX4} y2={ann.crossY4} style={{ stroke: ann.color, strokeWidth: 2.2 }} />
+              <line x1={ann.tailX} y1={ann.tailY} x2={ann.labelX} y2={ann.labelY} style={{ stroke: ann.color, strokeWidth: 1.2, strokeOpacity: 0.8 }} markerEnd={`url(#${markerId})`} />
+              <line x1={ann.crossX1} y1={ann.crossY1} x2={ann.crossX2} y2={ann.crossY2} style={{ stroke: ann.color, strokeWidth: 1.4, strokeOpacity: 0.85, strokeLinecap: 'round' }} />
+              <line x1={ann.crossX3} y1={ann.crossY3} x2={ann.crossX4} y2={ann.crossY4} style={{ stroke: ann.color, strokeWidth: 1.4, strokeOpacity: 0.85, strokeLinecap: 'round' }} />
               {showBreachNumbers && (
                 <foreignObject x={ann.tailX} y={ann.tailY} width="1" height="1" style={{ overflow: 'visible', pointerEvents: 'none' }}>
                   <div style={{ ...labelStyle('#000', 15, 700), borderRadius: 10 }}>{ann.markerLabel}</div>

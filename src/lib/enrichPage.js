@@ -48,17 +48,20 @@ export function enrichPage(page, handlers = {}) {
       labelY = c.y
       svgLabel = markerLabel + ' · ' + (areaStr || (a.substrate || 'Substrate not set'))
     } else if (a.type === 'point') {
-      counters.point++
-      markerLabel = 'B' + (breachStart + counters.point - 1)
+      const qty = Math.max(1, parseInt(a.qty, 10) || 1)
+      const firstNum = breachStart + counters.point
+      const lastNum = firstNum + qty - 1
+      counters.point += qty
+      markerLabel = qty > 1 ? `B${firstNum}-${lastNum}` : `B${firstNum}`
       labelX = a.points[0].x
       labelY = a.points[0].y
-      valueLabel = a.note || 'No notes yet'
+      valueLabel = (qty > 1 ? `×${qty} · ` : '') + (a.note || 'No notes yet')
       let tailDx = 30, tailDy = -30
       if (labelX + tailDx > vbW - 20) tailDx = -30
       if (labelY + tailDy < 20) tailDy = 30
       tailX = labelX + tailDx
       tailY = labelY + tailDy
-      const cs = 5
+      const cs = 3.5
       crossX1 = labelX - cs; crossY1 = labelY - cs; crossX2 = labelX + cs; crossY2 = labelY + cs
       crossX3 = labelX - cs; crossY3 = labelY + cs; crossX4 = labelX + cs; crossY4 = labelY - cs
     } else if (a.type === 'text') {
@@ -95,7 +98,7 @@ export function enrichPage(page, handlers = {}) {
 
   const totalLength = annotations.filter((a) => a.isLine).reduce((s, a) => s + (ppu ? polylineLen(a.points) / ppu : 0), 0)
   const totalArea = annotations.filter((a) => a.isArea).reduce((s, a) => s + (ppu ? a.netAreaUnits / (ppu * ppu) : 0), 0)
-  const breachCount = annotations.filter((a) => a.isPoint).length
+  const breachCount = counters.point
   const usedSubstrates = [...new Set(annotations.filter((a) => a.isArea).map((a) => a.substrate || 'Not set'))]
   const markupColours = usedSubstrates.map((s) => ({ label: s, color: SUBSTRATE_COLORS[s] || COLORS.area }))
   const symbolKeyItems = []

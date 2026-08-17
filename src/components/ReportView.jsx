@@ -3,11 +3,36 @@ import AnnotationLayer from './AnnotationLayer.jsx'
 
 export default function ReportView({ vm }) {
   return (
-    <div className="report-container" style={{ flex: 1, position: 'relative' }}>
-      {vm.reportPages.map((pg, i) => (
-        <DrawingPage key={pg.id} pg={pg} job={vm.job} reportYear={vm.reportYear} showBreachNumbers={vm.showBreachNumbers} markerId={`breachArrowReport${i}`} />
-      ))}
-      <SummaryPage vm={vm} />
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <PageSelector vm={vm} />
+      <div className="report-container" style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+        {vm.selectedReportPages.map((pg, i) => (
+          <DrawingPage key={pg.id} pg={pg} job={vm.job} reportYear={vm.reportYear} showBreachNumbers={vm.showBreachNumbers} markerId={`breachArrowReport${i}`} />
+        ))}
+        <SummaryPage vm={vm} />
+      </div>
+    </div>
+  )
+}
+
+function PageSelector({ vm }) {
+  if (vm.pageSelection.length <= 1) return null
+  return (
+    <div className="no-print" style={selectorBarStyle}>
+      <span style={selectorLabelStyle}>Include pages:</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
+        {vm.pageSelection.map((p) => (
+          <label key={p.id} style={pageCheckStyle}>
+            <input type="checkbox" checked={p.included} onChange={p.onToggle} />
+            <span>{p.name}</span>
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginLeft: 8 }}>
+        <button onClick={vm.selectAllReportPages} style={selectorLinkStyle}>All</button>
+        <button onClick={vm.selectNoReportPages} style={selectorLinkStyle}>None</button>
+      </div>
+      <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', flex: '0 0 auto' }}>Summary page is always included</span>
     </div>
   )
 }
@@ -88,7 +113,7 @@ function SummaryPage({ vm }) {
       </div>
 
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {vm.reportPages.map((pg) => (
+        {vm.selectedReportPages.map((pg) => (
           <div key={pg.id} style={{ marginBottom: 20 }}>
             <h2 style={{ fontSize: 15, margin: '0 0 6px' }}>{pg.name}</h2>
             {pg.hasMeasurements && (
@@ -139,3 +164,10 @@ const colHeadStyle = { fontWeight: 700, marginBottom: 3 }
 const swatchRowStyle = { display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }
 const thStyle = { textAlign: 'left', padding: '5px 4px' }
 const tdStyle = { padding: '5px 4px' }
+const selectorBarStyle = {
+  flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+  padding: '10px 20px', background: '#fff', borderBottom: '1px solid #e2e8f0', fontSize: 12,
+}
+const selectorLabelStyle = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: '#94a3b8', flex: '0 0 auto' }
+const pageCheckStyle = { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#334155', cursor: 'pointer' }
+const selectorLinkStyle = { background: 'none', border: 'none', color: '#2563eb', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }
