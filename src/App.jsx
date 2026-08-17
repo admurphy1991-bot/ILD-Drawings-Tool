@@ -28,7 +28,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', fontFamily: "'Public Sans',sans-serif", background: '#eef0f3', color: '#0f172a', overflow: 'hidden' }}>
+    <div className="app-shell" style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', fontFamily: "'Public Sans',sans-serif", background: '#eef0f3', color: '#0f172a', overflow: 'hidden' }}>
       <div className="no-print" style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
           <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: 0.2, flex: '0 0 auto' }}>Overlay</span>

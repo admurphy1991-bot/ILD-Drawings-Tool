@@ -23,7 +23,7 @@
 @media print {
   html, body { margin: 0 !important; padding: 0 !important; background: none !important; }
   @page { size: A4 landscape; margin: 0; }
-  .report-container { background: none; padding: 0; }
+  .report-container { background: none; padding: 0; overflow: visible !important; height: auto !important; min-height: 0 !important; }
   .report-page {
     box-shadow: none !important;
     border-radius: 0 !important;
