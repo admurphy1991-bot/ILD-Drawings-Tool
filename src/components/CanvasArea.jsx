@@ -90,10 +90,11 @@ export default function CanvasArea({ vm }) {
                 <option value="Plywood">Plywood</option>
                 <option value="Concrete">Concrete</option>
                 <option value="Warm Roof">Warm Roof</option>
+                <option value="Not Tested">Not Tested</option>
               </select>
             ) : (
               <>
-                {vm.formIsNote && (
+                {vm.formIsBreachNote && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <label style={{ fontSize: 12, color: '#475569' }}>Number of breaches here</label>
                     <input type="number" min="1" value={vm.activeForm.qty ?? 1} onChange={vm.onFormQtyChange} style={qtyInputStyle} />

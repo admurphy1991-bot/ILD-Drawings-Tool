@@ -18,7 +18,9 @@ export default function Sidebar({ vm }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <StatCard label="Length" value={pg.totalLengthLabel} />
           <StatCard label="Area" value={pg.totalAreaLabel} />
-          <StatCard label="Breaches flagged" value={pg.breachCount} span2 />
+          <StatCard label="Untested area" value={pg.untestedAreaLabel} />
+          <StatCard label="Breaches" value={pg.breachCount} />
+          <StatCard label="Areas of concern" value={pg.concernCount} span2 />
         </div>
       </div>
 

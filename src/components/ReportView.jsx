@@ -105,11 +105,12 @@ function SummaryPage({ vm }) {
     <section className="report-page" style={{ padding: 24 }}>
       <h1 style={{ fontSize: 26, margin: '0 0 4px' }}>{vm.job.reportTitle}</h1>
       <p style={{ fontSize: 13, color: '#475569', margin: '0 0 20px' }}>Prepared for {vm.reportSubtitle}</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 24 }}>
         <SummaryStat label="Pages" value={vm.pageCount} />
         <SummaryStat label="Total length" value={vm.overallLengthLabel} />
         <SummaryStat label="Total area" value={vm.overallAreaLabel} />
         <SummaryStat label="Breaches flagged" value={vm.overallBreach} />
+        <SummaryStat label="Concerns flagged" value={vm.overallConcern} />
       </div>
 
       <div style={{ flex: 1, overflow: 'auto' }}>
@@ -136,13 +137,30 @@ function SummaryPage({ vm }) {
                 </tbody>
               </table>
             )}
-            {pg.hasBreaches && pg.breaches.map((b) => (
-              <div key={b.id} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #e2e8f0' }}>
-                <div style={{ width: 18, height: 18, borderRadius: '50%', background: b.color, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>{b.markerLabel}</div>
-                <div style={{ flex: 1, fontSize: 11, color: '#334155' }}>{b.valueLabel}</div>
-                {b.hasPhoto && <img src={b.photo} loading="lazy" style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 3 }} />}
-              </div>
-            ))}
+            {pg.hasBreaches && (
+              <>
+                <div style={listHeadingStyle}>Breaches</div>
+                {pg.breaches.map((b) => (
+                  <div key={b.id} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: b.color, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>{b.markerLabel}</div>
+                    <div style={{ flex: 1, fontSize: 11, color: '#334155' }}>{b.valueLabel}</div>
+                    {b.hasPhoto && <img src={b.photo} loading="lazy" style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 3 }} />}
+                  </div>
+                ))}
+              </>
+            )}
+            {pg.hasConcerns && (
+              <>
+                <div style={listHeadingStyle}>Areas of concern</div>
+                {pg.concerns.map((c) => (
+                  <div key={c.id} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: c.color, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>{c.markerLabel}</div>
+                    <div style={{ flex: 1, fontSize: 11, color: '#334155' }}>{c.valueLabel}</div>
+                    {c.hasPhoto && <img src={c.photo} loading="lazy" style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 3 }} />}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -163,6 +181,7 @@ const colStyle = { padding: '6px 8px', borderRight: '1px solid #0f172a' }
 const colHeadStyle = { fontWeight: 700, marginBottom: 3 }
 const swatchRowStyle = { display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }
 const thStyle = { textAlign: 'left', padding: '5px 4px' }
+const listHeadingStyle = { fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.4, margin: '8px 0 2px' }
 const tdStyle = { padding: '5px 4px' }
 const selectorBarStyle = {
   flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',

@@ -300,13 +300,14 @@ export function useMarkupApp() {
       setDraft({ ...d, points: [...d.points, pt] })
       return
     }
-    if (activeTool === 'point') {
+    if (activeTool === 'point' || activeTool === 'concern') {
+      const isConcern = activeTool === 'concern'
       const id = 'a' + Date.now() + Math.floor(Math.random() * 1000)
-      const ann = { id, type: 'point', points: [pt], note: '', qty: 1 }
+      const ann = isConcern ? { id, type: 'concern', points: [pt], note: '' } : { id, type: 'point', points: [pt], note: '', qty: 1 }
       const h = pushHistory()
       setPages((ps) => ps.map((p, i) => (i === activePageIndex ? { ...p, annotations: [...p.annotations, ann] } : p)))
       setHistory(h)
-      setActiveForm({ annId: id, kind: 'note', value: '', qty: 1 })
+      setActiveForm({ annId: id, kind: 'note', value: '', qty: 1, isConcern })
       return
     }
     if (activeTool === 'text') {
@@ -377,7 +378,10 @@ export function useMarkupApp() {
         ...p,
         annotations: p.annotations.map((a) => {
           if (a.id !== activeForm.annId) return a
-          if (activeForm.kind === 'note') return { ...a, note: activeForm.value, qty: Math.max(1, parseInt(activeForm.qty, 10) || 1), photo: activeForm.photo || a.photo }
+          if (activeForm.kind === 'note') {
+            const qtyPatch = a.type === 'concern' ? {} : { qty: Math.max(1, parseInt(activeForm.qty, 10) || 1) }
+            return { ...a, note: activeForm.value, ...qtyPatch, photo: activeForm.photo || a.photo }
+          }
           if (activeForm.kind === 'substrate') return { ...a, substrate: activeForm.value }
           return { ...a, label: activeForm.value }
         }),
@@ -400,9 +404,9 @@ export function useMarkupApp() {
     setActiveForm(null)
   }
   function editAnnotation(ann) {
-    const kind = ann.type === 'point' ? 'note' : ann.type === 'area' ? 'substrate' : 'text'
+    const kind = (ann.type === 'point' || ann.type === 'concern') ? 'note' : ann.type === 'area' ? 'substrate' : 'text'
     const value = kind === 'note' ? (ann.note || '') : kind === 'substrate' ? (ann.substrate || '') : (ann.label || '')
-    setActiveForm({ annId: ann.id, kind, value, photo: ann.photo, qty: ann.qty || 1 })
+    setActiveForm({ annId: ann.id, kind, value, photo: ann.photo, qty: ann.qty || 1, isConcern: ann.type === 'concern' })
   }
   function deleteAnnotation(annId) {
     const h = pushHistory()
@@ -494,6 +498,7 @@ export function useMarkupApp() {
     { id: 'line', label: 'Line', color: '#2563eb' },
     { id: 'area', label: 'Area', color: '#16a34a' },
     { id: 'point', label: 'Breach', color: '#dc2626' },
+    { id: 'concern', label: 'Area of Concern', color: '#0891b2' },
     { id: 'text', label: 'Label', color: '#334155' },
     { id: 'pan', label: 'Pan', color: '#64748b' },
   ]
@@ -533,7 +538,8 @@ export function useMarkupApp() {
     calibrate: hasScale ? 'Recalibrate: click two points a known distance apart.' : 'Click two points a known distance apart (e.g. a wall or grid line), then enter the real length.',
     line: 'Click to place points along the run. Double-click or press Finish to complete.',
     area: 'Click to trace the region. Click back near your starting point (or press Finish) to close it.',
-    point: 'Click on the drawing to flag a breach or area of concern.',
+    point: 'Click on the drawing to flag a breach.',
+    concern: 'Click on the drawing to flag an area of concern.',
     text: 'Click on the drawing to place a text callout.',
     pan: 'Drag to move around the drawing.',
     exclude: 'Trace the untestable area (e.g. a hatch). Click back near your start point (or press Finish) to exclude it from the m² total.',
@@ -544,6 +550,7 @@ export function useMarkupApp() {
   const overallLength = selectedReportPages.reduce((s, p) => s + p.totalLength, 0)
   const overallArea = selectedReportPages.reduce((s, p) => s + p.totalArea, 0)
   const overallBreach = selectedReportPages.reduce((s, p) => s + p.breachCount, 0)
+  const overallConcern = selectedReportPages.reduce((s, p) => s + p.concernCount, 0)
   const pageSelection = pages.map((p) => ({
     id: p.id,
     name: p.name,
@@ -598,7 +605,10 @@ export function useMarkupApp() {
     formActive: !!activeForm, activeForm: activeForm || { value: '', qty: 1 },
     formIsSubstrate: !!(activeForm && activeForm.kind === 'substrate'),
     formIsNote: !!(activeForm && activeForm.kind === 'note'),
-    formTitle: activeForm && activeForm.kind === 'note' ? 'Breach / concern note' : activeForm && activeForm.kind === 'substrate' ? 'Substrate & membrane type' : 'Callout text',
+    formIsBreachNote: !!(activeForm && activeForm.kind === 'note' && !activeForm.isConcern),
+    formTitle: activeForm && activeForm.kind === 'note'
+      ? (activeForm.isConcern ? 'Area of concern note' : 'Breach note')
+      : activeForm && activeForm.kind === 'substrate' ? 'Substrate & membrane type' : 'Callout text',
     formPlaceholder: activeForm && activeForm.kind === 'note' ? 'Describe the issue…' : 'Label text…',
     formLeftPct, formTopPct,
     onFormValueChange: (e) => setFormValue(e.target.value),
@@ -617,15 +627,17 @@ export function useMarkupApp() {
       { label: 'Plywood', color: '#ccff00' },
       { label: 'Concrete', color: '#00e5ff' },
       { label: 'Warm Roof', color: '#ff3c00' },
+      { label: 'Not Tested', color: '#a855f7' },
       { label: 'Not set', color: '#39ff14' },
     ],
+    concernCount: activePageEnriched.concernCount,
     // job details
     job, updateJob,
     // report
     reportPages, selectedReportPages, pageSelection,
     toggleReportPage, selectAllReportPages, selectNoReportPages,
     overallLengthLabel: overallLength.toFixed(2) + ' m', overallAreaLabel: overallArea.toFixed(2) + ' m²',
-    overallBreach, pageCount: selectedReportPages.length, reportYear: new Date().getFullYear(),
+    overallBreach, overallConcern, pageCount: selectedReportPages.length, reportYear: new Date().getFullYear(),
     reportSubtitle: [job.clientName, job.address, job.date].filter(Boolean).join(' · '),
   }
 }
