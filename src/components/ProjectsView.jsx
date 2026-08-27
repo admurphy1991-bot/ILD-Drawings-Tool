@@ -5,11 +5,19 @@ export default function ProjectsView({ vm }) {
   const [reportTitle, setReportTitle] = useState('')
   const [clientName, setClientName] = useState('')
   const [address, setAddress] = useState('')
+  const [search, setSearch] = useState('')
 
   function submit() {
     if (!reportTitle.trim()) return
     vm.createProject({ reportTitle: reportTitle.trim(), clientName: clientName.trim(), address: address.trim() })
   }
+
+  const query = search.trim().toLowerCase()
+  const filteredProjects = query
+    ? vm.projectList.filter((p) =>
+        [p.name, p.clientName, p.address].filter(Boolean).some((v) => v.toLowerCase().includes(query))
+      )
+    : vm.projectList
 
   return (
     <div style={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'auto', padding: 40 }}>
@@ -25,6 +33,15 @@ export default function ProjectsView({ vm }) {
             <button onClick={() => setShowForm(true)} style={newProjectBtnStyle}>+ New Project</button>
           )}
         </div>
+
+        {!showForm && vm.projectList.length > 0 && (
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search projects by name, client, or address…"
+            style={searchInputStyle}
+          />
+        )}
 
         {showForm && (
           <div style={formCardStyle}>
@@ -58,9 +75,13 @@ export default function ProjectsView({ vm }) {
           </div>
         )}
 
-        {vm.projectList.length > 0 && (
+        {vm.projectList.length > 0 && filteredProjects.length === 0 && (
+          <div style={{ fontSize: 13, color: '#94a3b8' }}>No projects match "{search.trim()}".</div>
+        )}
+
+        {filteredProjects.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
-            {vm.projectList.map((p) => (
+            {filteredProjects.map((p) => (
               <ProjectCard key={p.id} p={p} />
             ))}
           </div>
@@ -103,7 +124,8 @@ function Field({ label, children }) {
   )
 }
 
-const newProjectBtnStyle = { flex: '0 0 auto', background: '#ea580c', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: 'pointer' }
+const searchInputStyle = { padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13.5, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
+const newProjectBtnStyle ={ flex: '0 0 auto', background: '#ea580c', color: '#fff', border: 'none', padding: '9px 16px', borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: 'pointer' }
 const formCardStyle = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 18 }
 const inputStyle = { padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13.5, fontFamily: 'inherit' }
 const createBtnStyle = { background: '#ea580c', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: 'pointer' }
